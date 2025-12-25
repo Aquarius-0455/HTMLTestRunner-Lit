@@ -5,6 +5,10 @@
 [![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+## 📸 预览
+
+![Report Preview](docs/screenshot.png)
+
 ## ✨ 特性
 
 - 🎨 **Bootstrap 5 + ECharts 5** 现代 UI 设计

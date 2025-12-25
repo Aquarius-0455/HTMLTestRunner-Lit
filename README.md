@@ -29,7 +29,7 @@ pip install htmltestrunner-modern
 或者从源码安装：
 
 ```bash
-git clone https://github.com/yourusername/HTMLTestRunner-Modern.git
+git clone https://github.com/Lit-CAO/HTMLTestRunner-Modern.git
 cd HTMLTestRunner-Modern
 pip install -e .
 ```

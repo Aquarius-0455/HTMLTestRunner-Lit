@@ -30,11 +30,11 @@ HTMLTestRunner Modern - 现代化的 Python 测试报告生成器
     ...     runner.run(suite)
 
 📝 License: MIT
-👤 Author: Your Name
-🔗 GitHub: https://github.com/yourusername/htmltestrunner-modern
+👤 Author: Lit
+🔗 GitHub: https://github.com/Lit-CAO/htmltestrunner-modern
 """
 
-__author__ = "Your Name"
+__author__ = "Lit"
 __version__ = "2.0.0"
 __license__ = "MIT"
 

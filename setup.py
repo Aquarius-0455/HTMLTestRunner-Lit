@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="htmltestrunner-modern",
-    version="2.0.0",
+    version="1.0.0",
     author="Lit",
     author_email="limin.cao@item.local",
     description="现代化的 Python unittest HTML 测试报告生成器",

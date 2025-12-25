@@ -16,10 +16,6 @@
 - 🎯 **自定义配色** 支持自定义主题颜色
 - 📤 **JSON 导出** 支持导出结构化测试结果
 
-## 📸 预览
-
-![Report Preview](https://via.placeholder.com/800x400?text=Report+Preview)
-
 ## 🚀 安装
 
 ### 方式 1：直接从 GitHub 安装（推荐）

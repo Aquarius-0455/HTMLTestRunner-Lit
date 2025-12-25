@@ -18,7 +18,7 @@
 - 📋 **测试详情** 支持复制、展开/折叠
 - 🧪 **subTest 支持** 完整支持子测试用例
 - 🎯 **自定义配色** 支持自定义主题颜色
-- 📤 **JSON 导出** 支持导出结构化测试结果
+- 🚀 **自动打开** 测试完成后自动打开报告
 
 ## 🚀 安装
 
@@ -90,20 +90,23 @@ runner = HTMLTestRunner(
 | 参数 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
 | stream | file | - | 输出文件流 |
-| title | str | "测试报告" | 报告标题 |
+| title | str | "Unit Test Report" | 报告标题 |
 | description | str | "" | 报告描述 |
-| tester | str | "QA" | 测试人员 |
+| tester | str | "QA Team" | 测试人员 |
 | verbosity | int | 1 | 详细程度 |
-| open_in_browser | bool | False | 是否自动打开 |
+| open_in_browser | bool | False | 测试完成后自动打开报告 |
 
 ## 📝 更新日志
 
-### v2.0.0
-- 全新 Bootstrap 5 UI
-- 添加 ECharts 图表支持
-- 深色/浅色主题切换
-- 响应式设计优化
-- subTest 支持
+### v1.0.0
+- 🎨 全新 Bootstrap 5 + ECharts 5 UI
+- 🌓 深色/浅色主题切换
+- 📱 响应式设计，完美支持移动端
+- 📊 环形图表可视化展示通过率
+- 🧪 完整支持 subTest 子测试用例
+- 📋 测试详情支持复制、展开/折叠
+- 🚀 支持 `open_in_browser` 自动打开报告
+- 👤 支持自定义 `tester` 测试人员
 
 ## 📄 许可证
 

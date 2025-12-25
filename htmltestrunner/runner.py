@@ -1,285 +1,281 @@
 # -*- coding: utf-8 -*-
-"""
-HTMLTestRunner Modern - 现代化的 Python 测试报告生成器
-
-🎨 Features:
-    - Bootstrap 5 + ECharts 5 现代 UI
-    - 深色/浅色主题切换
-    - 响应式设计，完美支持移动端
-    - 环形图表可视化展示通过率
-    - 测试详情支持复制、展开/折叠
-    - 支持 subTest 子测试用例
-    - 支持自定义主题配色
-    - 支持导出 JSON 格式结果
-
-🔧 Usage:
-    >>> import unittest
-    >>> from HTMLTestRunner_Modern import HTMLTestRunner
-    >>> 
-    >>> # 创建测试套件
-    >>> suite = unittest.TestLoader().loadTestsFromTestCase(YourTestCase)
-    >>> 
-    >>> # 生成报告
-    >>> with open('report.html', 'wb') as f:
-    ...     runner = HTMLTestRunner(
-    ...         stream=f,
-    ...         title='API 测试报告',
-    ...         description='项目接口自动化测试',
-    ...         tester='QA Team'
-    ...     )
-    ...     runner.run(suite)
-
-📝 License: MIT
-👤 Author: Lit
-🔗 GitHub: https://github.com/Aquarius-0455/HTMLTestRunner-Modern
-"""
-
 __author__ = "Lit"
-__version__ = "2.0.0"
-__license__ = "MIT"
+__version__ = "1.0.0"
+
+"""
+Version 1.0.0
+* 使用Bootstrap 5和ECharts 5 UI
+* 深色模式支持 (可切换主题)
+* 专业简洁的Ant Design风格配色
+* 响应式设计优化 - 完美支持移动端
+* 统计卡片可视化展示
+* 环形图表设计与通过率展示
+* 支持跳过测试用例显示
+* 测试详情支持复制和滚动
+* 图表标签优化避免重叠
+* Author: Lit
+
+"""
+
+# TODO: color stderr
+# TODO: simplify javascript using ,ore than 1 class in the class attribute?
 
 import datetime
 import sys
 import io
 import time
-import json
 import unittest
 from xml.sax import saxutils
-from typing import Optional, List, Dict, Any, Tuple
-from dataclasses import dataclass, field
-from enum import IntEnum
 
 
-# ============================================================================
-# Constants & Enums
-# ============================================================================
+# ------------------------------------------------------------------------
+# The redirectors below are used to capture output during testing. Output
+# sent to sys.stdout and sys.stderr are automatically captured. However
+# in some cases sys.stdout is already cached before HTMLTestRunner is
+# invoked (e.g. calling logging.basicConfig). In order to capture those
+# output, use the redirectors for the cached stream.
+#
+# e.g.
+#   >>> logging.basicConfig(stream=HTMLTestRunner.stdout_redirector)
+#   >>>
 
-class TestStatus(IntEnum):
-    """测试状态枚举"""
-    PASS = 0
-    FAIL = 1
-    ERROR = 2
-    SKIP = 3
-
-
-STATUS_LABELS = {
-    TestStatus.PASS: '通过',
-    TestStatus.FAIL: '失败',
-    TestStatus.ERROR: '错误',
-    TestStatus.SKIP: '跳过',
-}
-
-
-# ============================================================================
-# Output Redirector
-# ============================================================================
-
-class OutputRedirector:
-    """标准输出重定向器，用于捕获测试过程中的输出"""
-    
+class OutputRedirector(object):
+    """ Wrapper to redirect stdout or stderr """
     def __init__(self, fp):
         self.fp = fp
 
-    def write(self, s: str) -> None:
+    def write(self, s):
         self.fp.write(s)
 
-    def writelines(self, lines: List[str]) -> None:
+    def writelines(self, lines):
         self.fp.writelines(lines)
 
-    def flush(self) -> None:
+    def flush(self):
         self.fp.flush()
-
 
 stdout_redirector = OutputRedirector(sys.stdout)
 stderr_redirector = OutputRedirector(sys.stderr)
 
 
-# ============================================================================
-# Data Classes
-# ============================================================================
-
-@dataclass
-class TestCaseResult:
-    """单个测试用例的结果"""
-    status: TestStatus
-    test: unittest.TestCase
-    output: str
-    traceback: str
-    duration: float = 0.0
+# ----------------------------------------------------------------------
+# Template
 
 
-@dataclass
-class TestClassResult:
-    """测试类的汇总结果"""
-    name: str
-    description: str
-    pass_count: int = 0
-    fail_count: int = 0
-    error_count: int = 0
-    skip_count: int = 0
-    test_cases: List[TestCaseResult] = field(default_factory=list)
-    
-    @property
-    def total_count(self) -> int:
-        return self.pass_count + self.fail_count + self.error_count + self.skip_count
-    
-    @property
-    def status_class(self) -> str:
-        if self.error_count > 0:
-            return 'errorClass'
-        elif self.fail_count > 0:
-            return 'failClass'
-        elif self.skip_count > 0:
-            return 'skipClass'
-        return 'passClass'
+class Template_mixin(object):
+    """
+    Define a HTML template for report customerization and generation.
 
+    Overall structure of an HTML report
 
-@dataclass
-class ReportConfig:
-    """报告配置"""
-    title: str = 'Test Report'
-    description: str = ''
-    tester: str = 'QA Team'
-    theme: str = 'light'  # 'light' or 'dark'
-    chart_height: int = 400
-    show_pass_cases: bool = True
-    language: str = 'zh-CN'  # 'zh-CN' or 'en-US'
+    HTML
+    +------------------------+
+    |<html>                  |
+    |  <head>                |
+    |                        |
+    |   STYLESHEET           |
+    |   +----------------+   |
+    |   |                |   |
+    |   +----------------+   |
+    |                        |
+    |  </head>               |
+    |                        |
+    |  <body>                |
+    |                        |
+    |   HEADING              |
+    |   +----------------+   |
+    |   |                |   |
+    |   +----------------+   |
+    |                        |
+    |   REPORT               |
+    |   +----------------+   |
+    |   |                |   |
+    |   +----------------+   |
+    |                        |
+    |   ENDING               |
+    |   +----------------+   |
+    |   |                |   |
+    |   +----------------+   |
+    |                        |
+    |  </body>               |
+    |</html>                 |
+    +------------------------+
+    """
 
-
-# ============================================================================
-# Theme Configuration
-# ============================================================================
-
-class ThemeConfig:
-    """主题配置"""
-    
-    LIGHT = {
-        'primary': '#1890ff',
-        'success': '#52c41a',
-        'warning': '#faad14',
-        'danger': '#f5222d',
-        'info': '#13c2c2',
-        'border': '#d9d9d9',
-        'text': '#262626',
-        'text_secondary': '#8c8c8c',
-        'bg': '#f0f2f5',
-        'card_bg': '#ffffff',
-    }
-    
-    DARK = {
-        'primary': '#177ddc',
-        'success': '#49aa19',
-        'warning': '#d89614',
-        'danger': '#d32029',
-        'border': '#434343',
-        'text': '#e8e8e8',
-        'text_secondary': '#a6a6a6',
-        'bg': '#141414',
-        'card_bg': '#1f1f1f',
-    }
-    
-    # 可扩展更多主题
-    THEMES = {
-        'light': LIGHT,
-        'dark': DARK,
+    STATUS = {
+        0: u'通过',
+        1: u'失败',
+        2: u'错误',
+        3: u'跳过',
     }
 
+    DEFAULT_TITLE = 'Unit Test Report'
+    DEFAULT_DESCRIPTION = ''
 
-# ============================================================================
-# HTML Templates
-# ============================================================================
+    # ------------------------------------------------------------------------
+    # HTML Template
 
-class TemplateEngine:
-    """HTML 模板引擎"""
-    
-    # 多语言支持
-    I18N = {
-        'zh-CN': {
-            'title': '测试报告',
-            'start_time': '开始时间',
-            'duration': '运行时长',
-            'status': '状态',
-            'tester': '测试人',
-            'test_details': '测试详情',
-            'summary': '总结',
-            'failed': '失败',
-            'all': '全部',
-            'test_suite': '测试套件/测试用例',
-            'total': '总数',
-            'pass': '通过',
-            'fail': '失败',
-            'error': '错误',
-            'skip': '跳过',
-            'view': '查看',
-            'detail': '详情',
-            'total_summary': '总计',
-            'execution_details': '执行详情',
-            'copy': '复制',
-            'copied': '已复制',
-            'close': '关闭',
-            'no_output': '无输出信息',
-            'pass_rate': '通过率',
-            'test_execution': '测试执行情况',
-            'powered_by': '由 HTMLTestRunner Modern 驱动',
-            'generated_on': '生成于',
-            'toggle_theme': '切换主题',
-        },
-        'en-US': {
-            'title': 'Test Report',
-            'start_time': 'Start Time',
-            'duration': 'Duration',
-            'status': 'Status',
-            'tester': 'Tester',
-            'test_details': 'Test Details',
-            'summary': 'Summary',
-            'failed': 'Failed',
-            'all': 'All',
-            'test_suite': 'Test Suite / Test Case',
-            'total': 'Total',
-            'pass': 'Pass',
-            'fail': 'Fail',
-            'error': 'Error',
-            'skip': 'Skip',
-            'view': 'View',
-            'detail': 'Detail',
-            'total_summary': 'Total',
-            'execution_details': 'Execution Details',
-            'copy': 'Copy',
-            'copied': 'Copied',
-            'close': 'Close',
-            'no_output': 'No output',
-            'pass_rate': 'Pass Rate',
-            'test_execution': 'Test Execution',
-            'powered_by': 'Powered by HTMLTestRunner Modern',
-            'generated_on': 'Generated on',
-            'toggle_theme': 'Toggle Theme',
-        }
-    }
-    
-    @classmethod
-    def get_text(cls, key: str, language: str = 'zh-CN') -> str:
-        """获取多语言文本"""
-        return cls.I18N.get(language, cls.I18N['zh-CN']).get(key, key)
-
-    HTML_TEMPLATE = r'''<!DOCTYPE html>
-<html lang="%(lang)s">
+    HTML_TMPL = r"""<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="HTMLTestRunner Modern %(version)s">
-    <meta name="author" content="%(author)s">
+    <meta name="generator" content="%(generator)s"/>
     <title>%(title)s</title>
     
-    <!-- External Resources -->
+    <!-- Bootstrap 5.3 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- ECharts 5.x -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     %(stylesheet)s
+    
 </head>
 <body>
-    %(scripts)s
+    <script type="text/javascript">
+    /* level - 0:Summary; 1:Failed; 2:All */
+    function showCase(level) {
+        const trs = document.getElementsByTagName("tr");
+        for (let i = 0; i < trs.length; i++) {
+            const tr = trs[i];
+            const id = tr.id;
+            // ft: fail test, pt: pass test, st: skip test
+            if (id.substr(0,2) === 'ft') {
+                // 失败/错误用例：总结时隐藏，失败和全部时显示
+                tr.style.display = level < 1 ? 'none' : 'table-row';
+            }
+            if (id.substr(0,2) === 'pt') {
+                // 通过用例：只在全部时显示
+                tr.style.display = level > 1 ? 'table-row' : 'none';
+            }
+            if (id.substr(0,2) === 'st') {
+                // 跳过用例：只在全部时显示
+                tr.style.display = level > 1 ? 'table-row' : 'none';
+            }
+        }
+        
+        // 更新按钮激活状态
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    function showClassDetail(cid, count) {
+        // 找到第一个测试用例元素，判断当前是显示还是隐藏
+        const tid0 = 't' + cid.substr(1) + '.1';
+        let firstTid = 'f' + tid0;
+        let firstElem = document.getElementById(firstTid);
+        if (!firstElem) {
+            firstTid = 'p' + tid0;
+            firstElem = document.getElementById(firstTid);
+        }
+        
+        if (!firstElem) return;
+        
+        // 判断当前状态：如果是隐藏的，则展开；如果是显示的，则隐藏
+        const isHidden = firstElem.style.display === 'none' || firstElem.style.display === '';
+        
+        // 切换所有测试用例的显示状态
+        for (let i = 0; i < count; i++) {
+            const tid0 = 't' + cid.substr(1) + '.' + (i+1);
+            let tid = 'f' + tid0;
+            let elem = document.getElementById(tid);
+            if (!elem) {
+                tid = 'p' + tid0;
+                elem = document.getElementById(tid);
+            }
+            
+            if (elem) {
+                elem.style.display = isHidden ? 'table-row' : 'none';
+                // 如果隐藏测试用例，同时隐藏其详情窗口
+                const divElem = document.getElementById('div_' + tid);
+                if (divElem && !isHidden) {
+                    divElem.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    function showTestDetail(div_id){
+        const details_div = document.getElementById(div_id);
+        const displayState = details_div.style.display;
+        details_div.style.display = (displayState !== 'block') ? 'block' : 'none';
+    }
+    
+    // 复制测试详情内容
+    function copyTestDetail(contentId, button) {
+        const content = document.getElementById(contentId);
+        if (!content) return;
+        
+        const text = content.textContent;
+        
+        // 使用现代浏览器的Clipboard API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showCopySuccess(button);
+            }).catch(() => {
+                // 降级到旧方法
+                fallbackCopy(text, button);
+            });
+        } else {
+            // 降级到旧方法
+            fallbackCopy(text, button);
+        }
+    }
+    
+    // 降级复制方法
+    function fallbackCopy(text, button) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            showCopySuccess(button);
+        } catch (err) {
+            console.error('复制失败:', err);
+        }
+        document.body.removeChild(textarea);
+    }
+    
+    // 显示复制成功提示
+    function showCopySuccess(button) {
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check-lg"></i> 已复制';
+        button.classList.add('copy-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copy-success');
+        }, 2000);
+    }
+    
+    // 主题切换功能
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-bs-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-bs-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        
+        // 更新图表主题
+        const chart = echarts.getInstanceByDom(document.getElementById('chart'));
+        if (chart) {
+            chart.dispose();
+            initChart();
+        }
+    }
+    
+    // 页面加载时恢复主题
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+    });
+    </script>
+
     <div class="container-fluid">
         %(heading)s
         %(report)s
@@ -287,1114 +283,1235 @@ class TemplateEngine:
     </div>
     %(chart_script)s
 </body>
-</html>'''
+</html>
+"""  # variables: (title, generator, stylesheet, heading, report, ending, chart_script)
 
-    STYLESHEET = '''
-<style>
-:root {
-    --primary: #1890ff;
-    --success: #52c41a;
-    --warning: #faad14;
-    --danger: #f5222d;
-    --info: #13c2c2;
-    --border: #d9d9d9;
-    --text: #262626;
-    --text-secondary: #8c8c8c;
-    --bg: #f0f2f5;
-    --card-bg: #ffffff;
-    --table-header-bg: #fafafa;
-    --hover-bg: #fafafa;
-}
-
-[data-bs-theme="dark"] {
-    --primary: #177ddc;
-    --success: #49aa19;
-    --warning: #d89614;
-    --danger: #d32029;
-    --border: #434343;
-    --text: #e8e8e8;
-    --text-secondary: #a6a6a6;
-    --bg: #141414;
-    --card-bg: #1f1f1f;
-    --table-header-bg: #141414;
-    --hover-bg: #262626;
-}
-
-* { box-sizing: border-box; }
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    background: var(--bg);
-    min-height: 100vh;
-    padding: 24px;
-    margin: 0;
-    color: var(--text);
-    transition: background-color 0.3s, color 0.3s;
-}
-
-.container-fluid { max-width: 1400px; margin: 0 auto; }
-
-/* Cards */
-.card-custom {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid var(--border);
-    transition: all 0.3s;
-}
-
-.card-custom:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-/* Header */
-.report-title {
-    font-size: 28px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--primary), var(--info));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.report-title i {
-    font-size: 32px;
-    color: var(--primary);
-    -webkit-text-fill-color: var(--primary);
-}
-
-/* Theme Toggle */
-.theme-toggle {
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    z-index: 1000;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s;
-    color: var(--text);
-    font-size: 20px;
-}
-
-.theme-toggle:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-}
-
-/* Stats Grid */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.stat-card {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid var(--border);
-    transition: all 0.3s;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    border-radius: 12px 12px 0 0;
-}
-
-.stat-card.info::before { background: var(--info); }
-.stat-card.primary::before { background: var(--primary); }
-.stat-card.success::before { background: var(--success); }
-.stat-card.secondary::before { background: var(--text-secondary); }
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-.stat-label {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-    font-weight: 500;
-}
-
-.stat-value {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text);
-}
-
-.stat-icon {
-    position: absolute;
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 32px;
-    opacity: 0.15;
-}
-
-/* Table */
-.table-card {
-    overflow: hidden;
-}
-
-#result_table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-#result_table thead th {
-    background: var(--table-header-bg);
-    color: var(--text);
-    font-weight: 600;
-    padding: 14px 16px;
-    font-size: 14px;
-    border-bottom: 2px solid var(--border);
-    text-align: left;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-#result_table tbody tr {
-    transition: all 0.2s;
-    border-bottom: 1px solid var(--border);
-}
-
-#result_table tbody tr:hover {
-    background: var(--hover-bg);
-}
-
-#result_table td {
-    padding: 14px 16px;
-    vertical-align: middle;
-    font-size: 14px;
-}
-
-/* Status Classes */
-.passClass { background: rgba(82, 196, 26, 0.08); }
-.failClass { background: rgba(250, 173, 20, 0.08); }
-.errorClass { background: rgba(245, 34, 45, 0.08); }
-.skipClass { background: rgba(24, 144, 255, 0.08); }
-
-.passCase { color: var(--success); }
-.failCase { color: var(--warning); }
-.errorCase { color: var(--danger); }
-.skipCase { color: var(--primary); }
-
-/* Badges */
-.badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 12px;
-}
-
-/* Filter Buttons */
-.filter-btn {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.3s;
-    background: var(--card-bg);
-    color: var(--text);
-}
-
-.filter-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.filter-btn.active {
-    background: linear-gradient(135deg, var(--primary), #40a9ff);
-    border-color: var(--primary);
-    color: white;
-}
-
-/* Test Case Row */
-.testcase {
-    margin-left: 28px;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* Popup Window */
-.popup_window {
-    display: none;
-    margin-top: 12px;
-    background: var(--table-header-bg);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    overflow: hidden;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.popup_window_header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--card-bg);
-}
-
-.popup_window_content {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 16px;
-}
-
-.popup_window_content pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    margin: 0;
-    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--text);
-}
-
-/* Action Buttons */
-.action-btn {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: var(--text);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.action-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.copy-success {
-    color: var(--success) !important;
-    border-color: var(--success) !important;
-}
-
-/* Footer */
-.footer-card {
-    text-align: center;
-    padding: 32px;
-    background: linear-gradient(135deg, var(--card-bg), var(--bg));
-}
-
-/* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.card-custom { animation: fadeIn 0.5s ease forwards; }
-.stats-grid .stat-card:nth-child(1) { animation-delay: 0.1s; }
-.stats-grid .stat-card:nth-child(2) { animation-delay: 0.2s; }
-.stats-grid .stat-card:nth-child(3) { animation-delay: 0.3s; }
-.stats-grid .stat-card:nth-child(4) { animation-delay: 0.4s; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
-[data-bs-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
-
-/* Responsive */
-@media (max-width: 768px) {
-    body { padding: 12px; }
-    .card-custom { padding: 16px; }
-    .report-title { font-size: 20px; }
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-    .theme-toggle { width: 40px; height: 40px; top: 12px; right: 12px; }
-}
-
-@media (max-width: 480px) {
-    .stats-grid { grid-template-columns: 1fr; }
-    .filter-btn { padding: 6px 12px; font-size: 12px; }
-}
-</style>'''
-
-    SCRIPTS = '''
-<script>
-// Theme Management
-const ThemeManager = {
-    init() {
-        const saved = localStorage.getItem('theme') || 'light';
-        this.setTheme(saved);
-    },
-    toggle() {
-        const current = document.documentElement.getAttribute('data-bs-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        this.setTheme(next);
-    },
-    setTheme(theme) {
-        document.documentElement.setAttribute('data-bs-theme', theme);
-        localStorage.setItem('theme', theme);
-        this.updateIcon(theme);
-        this.updateChart(theme);
-    },
-    updateIcon(theme) {
-        const icon = document.getElementById('theme-icon');
-        if (icon) icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
-    },
-    updateChart(theme) {
+    ECHARTS_SCRIPT = """
+    <script type="text/javascript">
+    function initChart() {
         const chartDom = document.getElementById('chart');
-        if (chartDom && window.initChart) {
-            const chart = echarts.getInstanceByDom(chartDom);
-            if (chart) chart.dispose();
-            window.initChart();
+        const myChart = echarts.init(chartDom);
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        
+        const passCount = %(Pass)s;
+        const failCount = %(fail)s;
+        const errorCount = %(error)s;
+        const skipCount = %(skip)s;
+        const total = passCount + failCount + errorCount + skipCount;
+        const passRate = total > 0 ? ((passCount / total) * 100).toFixed(1) : 0;
+
+        const option = {
+            title: {
+                text: '测试执行情况',
+                subtext: '通过率: ' + passRate + '%%',
+                left: 'center',
+                top: '2%%',
+                textStyle: {
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: isDark ? '#e8e8e8' : '#262626'
+                },
+                subtextStyle: {
+                    fontSize: 13,
+                    color: isDark ? '#a6a6a6' : '#8c8c8c',
+                    lineHeight: 24
+                }
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: '{a} <br/>{b}: {c} ({d}%%)',
+                backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.95)',
+                borderColor: isDark ? '#434343' : '#d9d9d9',
+                borderWidth: 1,
+                textStyle: {
+                    color: isDark ? '#e8e8e8' : '#262626',
+                    fontSize: 13
+                }
+            },
+            legend: {
+                orient: 'horizontal',
+                bottom: '5%%',
+                left: 'center',
+                itemGap: 24,
+                textStyle: {
+                    fontSize: 13,
+                    color: isDark ? '#e8e8e8' : '#262626'
+                },
+                data: ['通过', '失败', '错误', '跳过'],
+                formatter: function(name) {
+                    const dataMap = {
+                        '通过': passCount,
+                        '失败': failCount,
+                        '错误': errorCount,
+                        '跳过': skipCount
+                    };
+                    return name + ': ' + dataMap[name];
+                }
+            },
+            series: [
+                {
+                    name: '测试结果',
+                    type: 'pie',
+                    radius: ['40%%', '60%%'],
+                    center: ['50%%', '50%%'],
+                    avoidLabelOverlap: true,
+                    itemStyle: {
+                        borderRadius: 4,
+                        borderColor: isDark ? '#141414' : '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        position: 'outside',
+                        formatter: function(params) {
+                            if (params.value === 0) {
+                                return '';  // 不显示值为0的标签
+                            }
+                            return params.name + '\\n' + params.value + ' (' + params.percent + '%%)';
+                        },
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: isDark ? '#e8e8e8' : '#262626',
+                        distanceToLabelLine: 5
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 14,
+                            fontWeight: 600
+                        },
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowOffsetX: 0,
+                            shadowColor: 'rgba(0, 0, 0, 0.2)'
+                        },
+                        scale: true,
+                        scaleSize: 5
+                    },
+                    labelLine: {
+                        show: true,
+                        length: 15,
+                        length2: 60,
+                        smooth: true,
+                        lineStyle: {
+                            color: isDark ? '#434343' : '#d9d9d9',
+                            width: 1
+                        }
+                    },
+                    data: [
+                        {
+                            value: passCount,
+                            name: '通过',
+                            itemStyle: { color: '#52c41a' }
+                        },
+                        {
+                            value: failCount,
+                            name: '失败',
+                            itemStyle: { color: '#faad14' }
+                        },
+                        {
+                            value: errorCount,
+                            name: '错误',
+                            itemStyle: { color: '#f5222d' }
+                        },
+                        {
+                            value: skipCount,
+                            name: '跳过',
+                            itemStyle: { color: '#1890ff' }
+                        }
+                    ],
+                    animationType: 'scale',
+                    animationEasing: 'cubicOut',
+                    animationDelay: function (idx) {
+                        return idx * 100;
+                    }
+                }
+            ]
+        };
+
+        myChart.setOption(option);
+        
+        // 响应式调整
+        window.addEventListener('resize', function() {
+            myChart.resize();
+        });
+    }
+    
+    // 页面加载完成后初始化图表
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initChart);
+    } else {
+        initChart();
+    }
+    </script>
+    """  # variables: (Pass, fail, error)
+
+    # ------------------------------------------------------------------------
+    # Stylesheet
+    #
+    # alternatively use a <link> for external style sheet, e.g.
+    #   <link rel="stylesheet" href="$url" type="text/css">
+
+    STYLESHEET_TMPL = """
+<style type="text/css">
+    :root {
+        --primary-color: #1890ff;
+        --success-color: #52c41a;
+        --warning-color: #faad14;
+        --danger-color: #f5222d;
+        --info-color: #13c2c2;
+        --border-color: #d9d9d9;
+        --text-color: #262626;
+        --text-secondary: #8c8c8c;
+        --bg-color: #f0f2f5;
+    }
+
+    [data-bs-theme="dark"] {
+        --primary-color: #177ddc;
+        --success-color: #49aa19;
+        --warning-color: #d89614;
+        --danger-color: #d32029;
+        --border-color: #434343;
+        --text-color: #e8e8e8;
+        --text-secondary: #a6a6a6;
+        --bg-color: #141414;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+        background: var(--bg-color);
+        min-height: 100vh;
+        padding: 24px;
+        margin: 0;
+        color: var(--text-color);
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* 头部样式 */
+    .header-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+    }
+
+    [data-bs-theme="dark"] .header-card {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+
+    .report-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .report-title i {
+        color: var(--primary-color);
+    }
+
+    .theme-toggle {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 1000;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.2s;
+        color: var(--text-color);
+    }
+
+    [data-bs-theme="dark"] .theme-toggle {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+
+    .theme-toggle:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border-color: var(--primary-color);
+    }
+
+    /* 统计卡片 */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s;
+    }
+
+    [data-bs-theme="dark"] .stat-card {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-color: var(--primary-color);
+    }
+
+    .stat-card.info .stat-icon { color: var(--info-color); }
+    .stat-card.primary .stat-icon { color: var(--primary-color); }
+    .stat-card.success .stat-icon { color: var(--success-color); }
+    .stat-card.secondary .stat-icon { color: var(--text-secondary); }
+
+    .stat-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-color);
+    }
+
+    .stat-icon {
+        font-size: 20px;
+        float: right;
+        opacity: 0.8;
+    }
+
+    /* 图表卡片 */
+    .chart-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+    }
+
+    [data-bs-theme="dark"] .chart-card {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+
+    /* 过滤按钮 */
+    .filter-buttons {
+        margin-bottom: 0;
+    }
+
+    .filter-btn {
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 14px;
+        transition: all 0.2s;
+        background: white;
+        color: var(--text-color);
+    }
+
+    [data-bs-theme="dark"] .filter-btn {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+
+    .filter-btn:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .filter-btn.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+    }
+
+    /* 表格样式 */
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    [data-bs-theme="dark"] .table-card {
+        background: #1f1f1f;
+        border-color: var(--border-color);
+    }
+    
+    .table-card h2 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-color);
+    }
+
+    #result_table {
+        width: 100%%;
+        margin-bottom: 0;
+        border-collapse: collapse;
+    }
+
+    #result_table thead th {
+        background: #fafafa;
+        color: var(--text-color);
+        font-weight: 600;
+        padding: 12px 16px;
+        font-size: 14px;
+        border-bottom: 1px solid var(--border-color);
+        text-align: left;
+    }
+
+    [data-bs-theme="dark"] #result_table thead th {
+        background: #141414;
+    }
+
+    #result_table tbody tr {
+        transition: background 0.2s;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    #result_table tbody tr:hover {
+        background-color: #fafafa;
+    }
+
+    [data-bs-theme="dark"] #result_table tbody tr:hover {
+        background-color: #262626;
+    }
+
+    #result_table td {
+        padding: 12px 16px;
+        vertical-align: middle;
+        font-size: 14px;
+    }
+
+    .passClass {
+        background: #f6ffed;
+    }
+
+    [data-bs-theme="dark"] .passClass {
+        background: rgba(82, 196, 26, 0.1);
+    }
+
+    .failClass {
+        background: #fffbe6;
+    }
+
+    [data-bs-theme="dark"] .failClass {
+        background: rgba(250, 173, 20, 0.1);
+    }
+
+    .errorClass {
+        background: #fff1f0;
+    }
+
+    [data-bs-theme="dark"] .errorClass {
+        background: rgba(245, 34, 45, 0.1);
+    }
+
+    .skipClass {
+        background: #f0f5ff;
+    }
+
+    [data-bs-theme="dark"] .skipClass {
+        background: rgba(24, 144, 255, 0.1);
+    }
+
+    #total_row {
+        font-weight: 600;
+        background: #fafafa;
+        border-top: 2px solid var(--border-color);
+    }
+
+    [data-bs-theme="dark"] #total_row {
+        background: #141414;
+    }
+
+    .passCase { color: var(--success-color); }
+    .failCase { color: var(--warning-color); }
+    .errorCase { color: var(--danger-color); }
+    .skipCase { color: var(--primary-color); }
+
+    .testcase {
+        margin-left: 24px;
+        font-size: 14px;
+    }
+
+    /* 详情弹窗 */
+    .popup_link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .popup_link:hover {
+        opacity: 0.8;
+    }
+
+    .popup_window {
+        display: none;
+        margin-top: 12px;
+        background: #fafafa;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        position: relative;
+    }
+
+    [data-bs-theme="dark"] .popup_window {
+        background: #141414;
+        border-color: var(--border-color);
+    }
+
+    .popup_window_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .popup_window_header strong {
+        font-size: 14px;
+        color: var(--text-color);
+    }
+
+    .popup_window_actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .popup_window_actions button {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 4px 12px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    [data-bs-theme="dark"] .popup_window_actions button {
+        background: #1f1f1f;
+    }
+
+    .popup_window_actions button:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .popup_window_content {
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .popup_window_content pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-color);
+    }
+    
+    .copy-success {
+        color: var(--success-color) !important;
+        border-color: var(--success-color) !important;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        body {
+            padding: 16px;
+        }
+
+        .header-card, .chart-card, .table-card {
+            padding: 16px;
+        }
+
+        .report-title {
+            font-size: 20px;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        #result_table {
+            font-size: 13px;
+        }
+
+        #result_table td, #result_table th {
+            padding: 8px;
         }
     }
-};
 
-// Case Filter
-function showCase(level) {
-    const rows = document.querySelectorAll('tr[id^="ft"], tr[id^="pt"], tr[id^="st"]');
-    rows.forEach(row => {
-        const prefix = row.id.substring(0, 2);
-        let show = false;
-        if (level === 0) show = false;  // Summary
-        else if (level === 1) show = prefix === 'ft';  // Failed only
-        else show = true;  // All
-        row.style.display = show ? 'table-row' : 'none';
-        if (!show) {
-            const popup = document.getElementById('div_' + row.id);
-            if (popup) popup.style.display = 'none';
-        }
-    });
-    document.querySelectorAll('.filter-btn').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === level);
-    });
-}
-
-// Class Detail Toggle
-function showClassDetail(cid, count) {
-    const baseId = cid.substring(1);
-    let firstRow = null;
-    for (let i = 1; i <= count; i++) {
-        const tid = `t${baseId}.${i}`;
-        const row = document.getElementById('f' + tid) || document.getElementById('p' + tid) || document.getElementById('s' + tid);
-        if (row && !firstRow) firstRow = row;
+    /* 徽章样式 */
+    .badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+        font-size: 12px;
     }
-    if (!firstRow) return;
-    
-    const isHidden = firstRow.style.display === 'none' || !firstRow.style.display;
-    for (let i = 1; i <= count; i++) {
-        const tid = `t${baseId}.${i}`;
-        const row = document.getElementById('f' + tid) || document.getElementById('p' + tid) || document.getElementById('s' + tid);
-        if (row) {
-            row.style.display = isHidden ? 'table-row' : 'none';
-            if (!isHidden) {
-                const popup = document.getElementById('div_' + row.id);
-                if (popup) popup.style.display = 'none';
-            }
-        }
+
+    /* 滚动条美化 */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
     }
-}
 
-// Test Detail Toggle
-function showTestDetail(divId) {
-    const div = document.getElementById(divId);
-    if (div) div.style.display = div.style.display === 'block' ? 'none' : 'block';
-}
-
-// Copy to Clipboard
-async function copyTestDetail(contentId, button) {
-    const content = document.getElementById(contentId);
-    if (!content) return;
-    
-    try {
-        await navigator.clipboard.writeText(content.textContent);
-        showCopySuccess(button);
-    } catch {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = content.textContent;
-        textarea.style.cssText = 'position:fixed;opacity:0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showCopySuccess(button);
+    ::-webkit-scrollbar-track {
+        background: transparent;
     }
-}
 
-function showCopySuccess(button) {
-    const original = button.innerHTML;
-    button.innerHTML = '<i class="bi bi-check-lg"></i> 已复制';
-    button.classList.add('copy-success');
-    setTimeout(() => {
-        button.innerHTML = original;
-        button.classList.remove('copy-success');
-    }, 2000);
-}
+    ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    ThemeManager.init();
-});
-</script>'''
+    [data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
 
-    HEADING_TEMPLATE = '''
-<button class="theme-toggle" onclick="ThemeManager.toggle()" title="%(toggle_theme)s">
-    <i class="bi bi-moon-stars-fill" id="theme-icon"></i>
-</button>
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.3);
+    }
 
-<div class="card-custom">
-    <h1 class="report-title">
-        <i class="bi bi-clipboard-data-fill"></i>
-        %(title)s
-    </h1>
+    [data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+</style>
+"""
+
+    # ------------------------------------------------------------------------
+    # Heading
+    #
+
+    HEADING_TMPL = """
+    <!-- 主题切换按钮 -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
+        <i class="bi bi-moon-stars-fill" id="theme-icon"></i>
+    </button>
     
-    <div class="stats-grid">
-        %(stats_cards)s
+    <!-- 头部卡片 -->
+    <div class='header-card'>
+        <h1 class='report-title'>
+            <i class="bi bi-clipboard-check"></i>
+            %(title)s
+        </h1>
+        
+        <!-- 统计卡片网格 -->
+        <div class='stats-grid'>
+            %(parameters)s
+        </div>
+        
+        <p class='description text-muted' style='font-size: 1.1rem; margin-top: 1.5rem;'>%(description)s</p>
     </div>
     
-    <p class="text-muted mb-0" style="font-size: 15px;">%(description)s</p>
-</div>
+    <!-- 图表卡片 -->
+    <div class='chart-card'>
+        <div id="chart" style="width:100%%;height:500px;"></div>
+    </div>
+    
+    <script>
+    // 更新主题图标
+    function updateThemeIcon() {
+        const icon = document.getElementById('theme-icon');
+        const theme = document.documentElement.getAttribute('data-bs-theme');
+        icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    }
+    
+    document.addEventListener('DOMContentLoaded', updateThemeIcon);
+    
+    // 在toggleTheme函数中更新图标
+    const originalToggleTheme = window.toggleTheme;
+    window.toggleTheme = function() {
+        originalToggleTheme();
+        updateThemeIcon();
+    };
+    </script>
+"""  # variables: (title, parameters, description)
 
-<div class="card-custom">
-    <div id="chart" style="width:100%%;height:%(chart_height)spx;"></div>
-</div>'''
+    HEADING_ATTRIBUTE_TMPL = """
+            <div class='stat-card %(card_class)s'>
+                <i class='%(icon)s stat-icon'></i>
+                <div class='stat-label'>%(name)s</div>
+                <div class='stat-value'>%(value)s</div>
+            </div>
+"""  # variables: (name, value, card_class, icon)
 
-    STAT_CARD_TEMPLATE = '''
-<div class="stat-card %(card_class)s">
-    <i class="bi %(icon)s stat-icon"></i>
-    <div class="stat-label">%(label)s</div>
-    <div class="stat-value">%(value)s</div>
-</div>'''
+    # ------------------------------------------------------------------------
+    # Report
+    #
 
-    REPORT_TEMPLATE = '''
-<div class="card-custom table-card">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h2 class="mb-0" style="font-size: 20px; font-weight: 600;">
-            <i class="bi bi-list-check"></i> %(test_details)s
-        </h2>
-        <div class="btn-group" role="group">
-            <button class="filter-btn active" onclick="showCase(0)">
-                <i class="bi bi-clipboard-data"></i> %(summary)s
-            </button>
-            <button class="filter-btn" onclick="showCase(1)">
-                <i class="bi bi-exclamation-triangle"></i> %(failed)s
-            </button>
-            <button class="filter-btn" onclick="showCase(2)">
-                <i class="bi bi-list-ul"></i> %(all)s
-            </button>
+    REPORT_TMPL = u"""
+    <div class="table-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">
+                <i class="bi bi-list-check"></i> 测试详情
+            </h2>
+            <div class="filter-buttons btn-group" role="group">
+                <button type="button" class="filter-btn active" onclick='showCase(0)'>
+                    <i class="bi bi-clipboard-data"></i> 总结
+                </button>
+                <button type="button" class="filter-btn" onclick='showCase(1)'>
+                    <i class="bi bi-exclamation-triangle"></i> 失败
+                </button>
+                <button type="button" class="filter-btn" onclick='showCase(2)'>
+                    <i class="bi bi-list-ul"></i> 全部
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table id='result_table' class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th style="min-width: 300px;"><i class="bi bi-folder2-open"></i> 测试套件/测试用例</th>
+                        <th class="text-center" style="width: 100px;"><i class="bi bi-hash"></i> 总数</th>
+                        <th class="text-center" style="width: 100px;"><i class="bi bi-check-circle"></i> 通过</th>
+                        <th class="text-center" style="width: 100px;"><i class="bi bi-x-circle"></i> 失败</th>
+                        <th class="text-center" style="width: 100px;"><i class="bi bi-exclamation-circle"></i> 错误</th>
+                        <th class="text-center" style="width: 100px;"><i class="bi bi-dash-circle"></i> 跳过</th>
+                        <th class="text-center" style="width: 120px;"><i class="bi bi-eye"></i> 查看</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    %(test_list)s
+                    <tr id='total_row'>
+                        <td><strong><i class="bi bi-calculator"></i> 总计</strong></td>
+                        <td class="text-center"><strong>%(count)s</strong></td>
+                        <td class="text-center"><span class="badge bg-success">%(Pass)s</span></td>
+                        <td class="text-center"><span class="badge bg-warning">%(fail)s</span></td>
+                        <td class="text-center"><span class="badge bg-danger">%(error)s</span></td>
+                        <td class="text-center"><span class="badge bg-primary">%(skip)s</span></td>
+                        <td>&nbsp;</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
-    
-    <div class="table-responsive">
-        <table id="result_table">
-            <thead>
-                <tr>
-                    <th style="min-width: 300px;"><i class="bi bi-folder2-open"></i> %(test_suite)s</th>
-                    <th class="text-center" style="width: 80px;"><i class="bi bi-hash"></i> %(total)s</th>
-                    <th class="text-center" style="width: 80px;"><i class="bi bi-check-circle"></i> %(pass)s</th>
-                    <th class="text-center" style="width: 80px;"><i class="bi bi-x-circle"></i> %(fail)s</th>
-                    <th class="text-center" style="width: 80px;"><i class="bi bi-exclamation-circle"></i> %(error)s</th>
-                    <th class="text-center" style="width: 80px;"><i class="bi bi-dash-circle"></i> %(skip)s</th>
-                    <th class="text-center" style="width: 100px;"><i class="bi bi-eye"></i> %(view)s</th>
-                </tr>
-            </thead>
-            <tbody>
-                %(test_list)s
-                %(total_row)s
-            </tbody>
-        </table>
-    </div>
-</div>'''
+"""  # variables: (test_list, count, Pass, fail, error, skip)
 
-    TOTAL_ROW_TEMPLATE = '''
-<tr style="font-weight: 600; background: var(--table-header-bg); border-top: 2px solid var(--border);">
-    <td><i class="bi bi-calculator"></i> %(total_summary)s</td>
-    <td class="text-center"><strong>%(count)s</strong></td>
-    <td class="text-center"><span class="badge bg-success">%(pass)s</span></td>
-    <td class="text-center"><span class="badge bg-warning">%(fail)s</span></td>
-    <td class="text-center"><span class="badge bg-danger">%(error)s</span></td>
-    <td class="text-center"><span class="badge bg-primary">%(skip)s</span></td>
-    <td>&nbsp;</td>
-</tr>'''
+    REPORT_CLASS_TMPL = u"""
+    <tr class='%(style)s'>
+        <td>
+            <strong><i class="bi bi-folder-fill"></i> %(desc)s</strong>
+        </td>
+        <td class="text-center">%(count)s</td>
+        <td class="text-center"><span class="badge bg-success">%(Pass)s</span></td>
+        <td class="text-center"><span class="badge bg-warning">%(fail)s</span></td>
+        <td class="text-center"><span class="badge bg-danger">%(error)s</span></td>
+        <td class="text-center"><span class="badge bg-primary">%(skip)s</span></td>
+        <td class="text-center">
+            <a href="javascript:showClassDetail('%(cid)s',%(count)s)" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-chevron-down"></i> 详情
+            </a>
+        </td>
+    </tr>
+"""  # variables: (style, desc, count, Pass, fail, error, skip, cid)
 
-    CLASS_ROW_TEMPLATE = '''
-<tr class="%(style)s">
-    <td><strong><i class="bi bi-folder-fill"></i> %(desc)s</strong></td>
-    <td class="text-center">%(count)s</td>
-    <td class="text-center"><span class="badge bg-success">%(pass)s</span></td>
-    <td class="text-center"><span class="badge bg-warning">%(fail)s</span></td>
-    <td class="text-center"><span class="badge bg-danger">%(error)s</span></td>
-    <td class="text-center"><span class="badge bg-primary">%(skip)s</span></td>
-    <td class="text-center">
-        <button class="action-btn" onclick="showClassDetail('%(cid)s', %(count)s)">
-            <i class="bi bi-chevron-down"></i> %(detail)s
-        </button>
-    </td>
-</tr>'''
-
-    TEST_ROW_TEMPLATE = '''
-<tr id="%(tid)s" style="display:none;">
-    <td class="%(style)s">
-        <div class="testcase">
+    REPORT_TEST_WITH_OUTPUT_TMPL = r"""
+<tr id='%(tid)s' style='display:none;'>
+    <td class='%(style)s'>
+        <div class='testcase'>
             <i class="bi bi-file-earmark-code"></i> %(desc)s
         </div>
     </td>
-    <td colspan="5">
+    <td colspan='5'>
         <div class="text-center">
-            <button class="action-btn" onclick="showTestDetail('div_%(tid)s')">
+            <a class="popup_link btn btn-sm btn-outline-info" onfocus='this.blur();' href="javascript:showTestDetail('div_%(tid)s')">
                 <i class="bi bi-info-circle"></i> %(status)s
-            </button>
+            </a>
         </div>
-        <div id="div_%(tid)s" class="popup_window">
+        <div id='div_%(tid)s' class="popup_window">
             <div class="popup_window_header">
-                <strong><i class="bi bi-terminal"></i> %(execution_details)s</strong>
-                <div style="display: flex; gap: 8px;">
-                    <button class="action-btn" onclick="copyTestDetail('content_%(tid)s', this)">
-                        <i class="bi bi-clipboard"></i> %(copy)s
+                <strong><i class="bi bi-terminal"></i> 执行详情</strong>
+                <div class="popup_window_actions">
+                    <button onclick="copyTestDetail('content_%(tid)s', this)" title="复制内容">
+                        <i class="bi bi-clipboard"></i> 复制
                     </button>
-                    <button class="action-btn" onclick="showTestDetail('div_%(tid)s')">
+                    <button onclick="showTestDetail('div_%(tid)s')" title="关闭">
                         <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
             </div>
             <div class="popup_window_content">
-                <pre id="content_%(tid)s">%(script)s</pre>
+                <pre id='content_%(tid)s'>%(script)s</pre>
             </div>
         </div>
     </td>
-</tr>'''
+</tr>
+"""  # variables: (tid, Class, style, desc, status)
 
-    ENDING_TEMPLATE = '''
-<div class="card-custom footer-card">
-    <p class="text-muted mb-2">
-        <i class="bi bi-code-square"></i>
-        %(powered_by)s v%(version)s
-    </p>
-    <p class="text-muted mb-2" style="font-size: 14px;">
-        <i class="bi bi-person-circle"></i>
-        %(tester)s
-    </p>
-    <p class="text-muted mb-0" style="font-size: 14px;">
-        <i class="bi bi-calendar3"></i>
-        %(generated_on)s %(time)s
-    </p>
-</div>'''
+    REPORT_TEST_OUTPUT_TMPL = r"""%(id)s: %(output)s"""  # variables: (id, output)
 
-    CHART_SCRIPT_TEMPLATE = '''
-<script>
-window.initChart = function() {
-    const chartDom = document.getElementById('chart');
-    if (!chartDom) return;
+    # ------------------------------------------------------------------------
+    # ENDING
+    #
+
+    ENDING_TMPL = """
+    <div id='ending' class='text-center py-5'>
+        <div class='card' style='background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);'>
+            <p class='text-muted mb-2'>
+                <i class="bi bi-code-square"></i> 
+                Powered by <strong>HTMLTestRunner</strong> v1.0.0 - Modern UI Edition
+            </p>
+            <p class='text-muted mb-2' style='font-size: 0.875rem;'>
+                <i class="bi bi-person-circle"></i> 
+                Author: <strong>Linker QA</strong>
+            </p>
+            <p class='text-muted mb-0' style='font-size: 0.875rem;'>
+                <i class="bi bi-calendar3"></i> 
+                Generated on <span id='generation-time'></span>
+            </p>
+        </div>
+    </div>
     
-    const chart = echarts.init(chartDom);
-    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-    
-    const data = {
-        pass: %(pass)s,
-        fail: %(fail)s,
-        error: %(error)s,
-        skip: %(skip)s
-    };
-    const total = data.pass + data.fail + data.error + data.skip;
-    const passRate = total > 0 ? ((data.pass / total) * 100).toFixed(1) : 0;
-
-    chart.setOption({
-        title: {
-            text: '%(test_execution)s',
-            subtext: '%(pass_rate)s: ' + passRate + '%%',
-            left: 'center',
-            top: '5%%',
-            textStyle: { fontSize: 18, fontWeight: 600, color: isDark ? '#e8e8e8' : '#262626' },
-            subtextStyle: { fontSize: 14, color: isDark ? '#a6a6a6' : '#8c8c8c' }
-        },
-        tooltip: {
-            trigger: 'item',
-            formatter: '{b}: {c} ({d}%%)',
-            backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)',
-            borderColor: isDark ? '#434343' : '#d9d9d9',
-            textStyle: { color: isDark ? '#e8e8e8' : '#262626' }
-        },
-        legend: {
-            orient: 'horizontal',
-            bottom: '5%%',
-            textStyle: { color: isDark ? '#e8e8e8' : '#262626' },
-            data: ['%(pass_label)s', '%(fail_label)s', '%(error_label)s', '%(skip_label)s']
-        },
-        series: [{
-            name: 'Result',
-            type: 'pie',
-            radius: ['45%%', '70%%'],
-            center: ['50%%', '50%%'],
-            avoidLabelOverlap: true,
-            itemStyle: { borderRadius: 8, borderColor: isDark ? '#141414' : '#fff', borderWidth: 3 },
-            label: {
-                formatter: p => p.value === 0 ? '' : p.name + '\\n' + p.value + ' (' + p.percent + '%%)',
-                color: isDark ? '#e8e8e8' : '#262626'
-            },
-            labelLine: { length: 20, length2: 40, lineStyle: { color: isDark ? '#434343' : '#d9d9d9' } },
-            emphasis: {
-                scale: true,
-                scaleSize: 8,
-                itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0,0,0,0.3)' }
-            },
-            data: [
-                { value: data.pass, name: '%(pass_label)s', itemStyle: { color: '#52c41a' } },
-                { value: data.fail, name: '%(fail_label)s', itemStyle: { color: '#faad14' } },
-                { value: data.error, name: '%(error_label)s', itemStyle: { color: '#f5222d' } },
-                { value: data.skip, name: '%(skip_label)s', itemStyle: { color: '#1890ff' } }
-            ],
-            animationType: 'scale',
-            animationEasing: 'elasticOut'
-        }]
+    <script>
+    // 显示生成时间
+    document.getElementById('generation-time').textContent = new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
     });
-    
-    window.addEventListener('resize', () => chart.resize());
-};
+    </script>
+    """
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initChart);
-} else {
-    window.initChart();
-}
-</script>'''
+# -------------------- The end of the Template class -------------------
 
 
-# ============================================================================
-# Test Result Class
-# ============================================================================
+TestResult = unittest.TestResult
 
-class HTMLTestResult(unittest.TestResult):
-    """增强的测试结果收集器"""
-    
-    def __init__(self, verbosity: int = 1):
-        super().__init__()
-        self.verbosity = verbosity
+
+class _TestResult(TestResult):
+    # note: _TestResult is a pure representation of results.
+    # It lacks the output and reporting ability compares to unittest._TextTestResult.
+
+    def __init__(self, verbosity=1):
+        TestResult.__init__(self)
+        self.stdout0 = None
+        self.stderr0 = None
         self.success_count = 0
         self.failure_count = 0
         self.error_count = 0
         self.skip_count = 0
-        self.results: List[Tuple[TestStatus, unittest.TestCase, str, str, float]] = []
-        self.subtest_list = []
-        self.output_buffer = io.StringIO()
-        self.start_time = time.time()
-        self._stdout = None
-        self._stderr = None
-        self._test_start_time = 0
+        self.verbosity = verbosity
 
-    def startTest(self, test: unittest.TestCase) -> None:
-        super().startTest(test)
-        self._test_start_time = time.time()
-        self.output_buffer = io.StringIO()
-        stdout_redirector.fp = self.output_buffer
-        stderr_redirector.fp = self.output_buffer
-        self._stdout = sys.stdout
-        self._stderr = sys.stderr
+        # result is a list of result in 4 tuple
+        # (
+        #   result code (0: success; 1: fail; 2: error; 3: skip),
+        #   TestCase object,
+        #   Test output (byte string),
+        #   stack trace,
+        # )
+        self.result = []
+        self.subtestlist = []
+        self.outputBuffer = io.StringIO()
+        self.test_start_time = round(time.time(), 2)
+
+    def startTest(self, test):
+        TestResult.startTest(self, test)
+        # just one buffer for both stdout and stderr
+        self.outputBuffer = io.StringIO()
+        stdout_redirector.fp = self.outputBuffer
+        stderr_redirector.fp = self.outputBuffer
+        self.stdout0 = sys.stdout
+        self.stderr0 = sys.stderr
         sys.stdout = stdout_redirector
         sys.stderr = stderr_redirector
 
-    def _get_output(self) -> str:
-        """获取并重置输出缓冲"""
-        if self._stdout:
-            sys.stdout = self._stdout
-            sys.stderr = self._stderr
-            self._stdout = None
-            self._stderr = None
-        return self.output_buffer.getvalue()
+    def complete_output(self):
+        """
+        Disconnect output redirection and return buffer.
+        Safe to call multiple times.
+        """
+        if self.stdout0:
+            sys.stdout = self.stdout0
+            sys.stderr = self.stderr0
+            self.stdout0 = None
+            self.stderr0 = None
+        return self.outputBuffer.getvalue()
 
-    def _get_duration(self) -> float:
-        """获取测试用时"""
-        return round(time.time() - self._test_start_time, 3)
+    def stopTest(self, test):
+        # Usually one of addSuccess, addError or addFailure would have been called.
+        # But there are some path in unittest that would bypass this.
+        # We must disconnect stdout in stopTest(), which is guaranteed to be called.
+        self.complete_output()
 
-    def stopTest(self, test: unittest.TestCase) -> None:
-        self._get_output()
-
-    def addSuccess(self, test: unittest.TestCase) -> None:
-        if test not in self.subtest_list:
+    def addSuccess(self, test):
+        if test not in self.subtestlist:
             self.success_count += 1
-            super().addSuccess(test)
-            self.results.append((TestStatus.PASS, test, self._get_output(), '', self._get_duration()))
-            self._log_result('S', test)
+            TestResult.addSuccess(self, test)
+            output = self.complete_output()
+            self.result.append((0, test, output, ''))
+            if self.verbosity > 1:
+                sys.stderr.write('ok ')
+                sys.stderr.write(str(test))
+                sys.stderr.write('\n')
+            else:
+                sys.stderr.write('S  ')
 
-    def addError(self, test: unittest.TestCase, err) -> None:
+    def addError(self, test, err):
         self.error_count += 1
-        super().addError(test, err)
-        _, exc_str = self.errors[-1]
-        self.results.append((TestStatus.ERROR, test, self._get_output(), exc_str, self._get_duration()))
-        self._log_result('E', test)
+        TestResult.addError(self, test, err)
+        _, _exc_str = self.errors[-1]
+        output = self.complete_output()
+        self.result.append((2, test, output, _exc_str))
+        if self.verbosity > 1:
+            sys.stderr.write('E  ')
+            sys.stderr.write(str(test))
+            sys.stderr.write('\n')
+        else:
+            sys.stderr.write('E')
 
-    def addFailure(self, test: unittest.TestCase, err) -> None:
+    def addFailure(self, test, err):
         self.failure_count += 1
-        super().addFailure(test, err)
-        _, exc_str = self.failures[-1]
-        self.results.append((TestStatus.FAIL, test, self._get_output(), exc_str, self._get_duration()))
-        self._log_result('F', test)
+        TestResult.addFailure(self, test, err)
+        _, _exc_str = self.failures[-1]
+        output = self.complete_output()
+        self.result.append((1, test, output, _exc_str))
+        if self.verbosity > 1:
+            sys.stderr.write('F  ')
+            sys.stderr.write(str(test))
+            sys.stderr.write('\n')
+        else:
+            sys.stderr.write('F')
 
-    def addSkip(self, test: unittest.TestCase, reason: str) -> None:
+    def addSkip(self, test, reason):
         self.skip_count += 1
-        super().addSkip(test, reason)
-        self.results.append((TestStatus.SKIP, test, self._get_output(), f'Skipped: {reason}', self._get_duration()))
-        self._log_result('s', test)
+        TestResult.addSkip(self, test, reason)
+        output = self.complete_output()
+        self.result.append((3, test, output, 'Skipped: ' + reason))
+        if self.verbosity > 1:
+            sys.stderr.write('SKIP ')
+            sys.stderr.write(str(test))
+            sys.stderr.write('\n')
+        else:
+            sys.stderr.write('s')
 
-    def addSubTest(self, test: unittest.TestCase, subtest, err) -> None:
+    def addSubTest(self, test, subtest, err):
         if err is not None:
+            if getattr(self, 'failfast', False):
+                self.stop()
             if issubclass(err[0], test.failureException):
                 self.failure_count += 1
-                self.failures.append((subtest, self._exc_info_to_string(err, subtest)))
-                output = self._get_output() + f'\nSubTest Failed: {subtest}'
-                self.results.append((TestStatus.FAIL, test, output, self._exc_info_to_string(err, subtest), self._get_duration()))
-                self._log_result('F', subtest)
+                errors = self.failures
+                errors.append((subtest, self._exc_info_to_string(err, subtest)))
+                output = self.complete_output()
+                self.result.append((1, test, output + '\nSubTestCase Failed:\n' + str(subtest),
+                                    self._exc_info_to_string(err, subtest)))
+                if self.verbosity > 1:
+                    sys.stderr.write('F  ')
+                    sys.stderr.write(str(subtest))
+                    sys.stderr.write('\n')
+                else:
+                    sys.stderr.write('F')
             else:
                 self.error_count += 1
-                self.errors.append((subtest, self._exc_info_to_string(err, subtest)))
-                output = self._get_output() + f'\nSubTest Error: {subtest}'
-                self.results.append((TestStatus.ERROR, test, output, self._exc_info_to_string(err, subtest), self._get_duration()))
-                self._log_result('E', subtest)
+                errors = self.errors
+                errors.append((subtest, self._exc_info_to_string(err, subtest)))
+                output = self.complete_output()
+                self.result.append(
+                    (2, test, output + '\nSubTestCase Error:\n' + str(subtest), self._exc_info_to_string(err, subtest)))
+                if self.verbosity > 1:
+                    sys.stderr.write('E  ')
+                    sys.stderr.write(str(subtest))
+                    sys.stderr.write('\n')
+                else:
+                    sys.stderr.write('E')
+            self._mirrorOutput = True
         else:
-            self.subtest_list.extend([subtest, test])
+            self.subtestlist.append(subtest)
+            self.subtestlist.append(test)
             self.success_count += 1
-            output = self._get_output() + f'\nSubTest Pass: {subtest}'
-            self.results.append((TestStatus.PASS, test, output, '', self._get_duration()))
-            self._log_result('S', subtest)
-
-    def _log_result(self, status: str, test) -> None:
-        """日志输出"""
-        if self.verbosity > 1:
-            sys.stderr.write(f'{status}  {test}\n')
-        else:
-            sys.stderr.write(status)
-
-    @property
-    def total_count(self) -> int:
-        return self.success_count + self.failure_count + self.error_count + self.skip_count
-
-    def to_dict(self) -> Dict[str, Any]:
-        """导出为字典格式"""
-        return {
-            'total': self.total_count,
-            'pass': self.success_count,
-            'fail': self.failure_count,
-            'error': self.error_count,
-            'skip': self.skip_count,
-            'pass_rate': round(self.success_count / self.total_count * 100, 2) if self.total_count else 0,
-        }
+            output = self.complete_output()
+            self.result.append((0, test, output + '\nSubTestCase Pass:\n' + str(subtest), ''))
+            if self.verbosity > 1:
+                sys.stderr.write('ok ')
+                sys.stderr.write(str(subtest))
+                sys.stderr.write('\n')
+            else:
+                sys.stderr.write('../HTTP_TestRunner')
 
 
-# ============================================================================
-# HTML Test Runner
-# ============================================================================
+class HTMLTestRunner(Template_mixin):
 
-class HTMLTestRunner:
-    """现代化 HTML 测试报告生成器"""
-    
-    def __init__(
-        self,
-        stream=sys.stdout,
-        verbosity: int = 1,
-        title: Optional[str] = None,
-        description: str = '',
-        tester: str = 'QA Team',
-        language: str = 'zh-CN',
-        chart_height: int = 400,
-    ):
+    def __init__(self, stream=sys.stdout, verbosity=1, title=None, description=None):
         self.stream = stream
         self.verbosity = verbosity
-        self.title = title or TemplateEngine.get_text('title', language)
-        self.description = description
-        self.tester = tester
-        self.language = language
-        self.chart_height = chart_height
-        self.start_time: Optional[datetime.datetime] = None
-        self.stop_time: Optional[datetime.datetime] = None
-        self.template = TemplateEngine()
+        if title is None:
+            self.title = self.DEFAULT_TITLE
+        else:
+            self.title = title
+        if description is None:
+            self.description = self.DEFAULT_DESCRIPTION
+        else:
+            self.description = description
 
-    def run(self, test: unittest.TestSuite) -> HTMLTestResult:
-        """运行测试并生成报告"""
-        result = HTMLTestResult(self.verbosity)
-        self.start_time = datetime.datetime.now()
-        
+        self.startTime = datetime.datetime.now()
+
+    def run(self, test):
+        "Run the given test case or test suite."
+        result = _TestResult(self.verbosity)
         test(result)
-        
-        self.stop_time = datetime.datetime.now()
-        self._generate_report(result)
-        
-        duration = self.stop_time - self.start_time
-        print(f'\n运行时长: {duration}', file=sys.stderr)
-        
+        self.stopTime = datetime.datetime.now()
+        self.generateReport(test, result)
+        print('\nTime 运行时长: %s' % (self.stopTime-self.startTime), file=sys.stderr)
         return result
 
-    def _get_text(self, key: str) -> str:
-        """获取当前语言的文本"""
-        return TemplateEngine.get_text(key, self.language)
+    def sortResult(self, result_list):
+        # unittest does not seems to run in any particular order.
+        # Here at least we want to group them together by class.
+        rmap = {}
+        classes = []
+        for n,t,o,e in result_list:
+            cls = t.__class__
+            if cls not in rmap:
+                rmap[cls] = []
+                classes.append(cls)
+            rmap[cls].append((n,t,o,e))
+        r = [(cls, rmap[cls]) for cls in classes]
+        return r
 
-    def _generate_report(self, result: HTMLTestResult) -> None:
-        """生成 HTML 报告"""
-        output = TemplateEngine.HTML_TEMPLATE % {
-            'lang': self.language,
-            'version': __version__,
-            'author': __author__,
-            'title': saxutils.escape(self.title),
-            'stylesheet': TemplateEngine.STYLESHEET,
-            'scripts': TemplateEngine.SCRIPTS,
-            'heading': self._generate_heading(result),
-            'report': self._generate_report_body(result),
-            'ending': self._generate_ending(),
-            'chart_script': self._generate_chart_script(result),
-        }
-        self.stream.write(output.encode('utf-8'))
-
-    def _generate_heading(self, result: HTMLTestResult) -> str:
-        """生成头部区域"""
-        duration = str(self.stop_time - self.start_time) if self.stop_time and self.start_time else '0:00:00'
-        start_time_str = self.start_time.strftime('%Y-%m-%d %H:%M:%S') if self.start_time else ''
-        
-        # 状态汇总
-        status_parts = []
-        if result.success_count:
-            status_parts.append(f'{self._get_text("pass")} {result.success_count}')
-        if result.failure_count:
-            status_parts.append(f'{self._get_text("fail")} {result.failure_count}')
-        if result.error_count:
-            status_parts.append(f'{self._get_text("error")} {result.error_count}')
-        if result.skip_count:
-            status_parts.append(f'{self._get_text("skip")} {result.skip_count}')
-        status_str = ' | '.join(status_parts) or 'N/A'
-        
-        # 统计卡片
-        stats = [
-            {'label': self._get_text('start_time'), 'value': start_time_str, 'class': 'info', 'icon': 'bi-clock-history'},
-            {'label': self._get_text('duration'), 'value': duration, 'class': 'primary', 'icon': 'bi-stopwatch'},
-            {'label': self._get_text('status'), 'value': status_str, 'class': 'success', 'icon': 'bi-flag-fill'},
-            {'label': self._get_text('tester'), 'value': self.tester, 'class': 'secondary', 'icon': 'bi-person-fill'},
+    def getReportAttributes(self, result):
+        """
+        Return report attributes as a list of (name, value).
+        Override this to add custom attributes.
+        """
+        startTime = str(self.startTime)[:19]
+        duration = str(self.stopTime - self.startTime)
+        tsname = "Linker QA"
+        status = []
+        if result.success_count: status.append(u'通过 %s' % result.success_count)
+        if result.failure_count: status.append(u'失败 %s' % result.failure_count)
+        if result.error_count:   status.append(u'错误 %s' % result.error_count)
+        if result.skip_count:    status.append(u'跳过 %s' % result.skip_count)
+        if status:
+            status = ' '.join(status)
+        else:
+            status = 'none'
+        return [
+            (u'开始时间', startTime),
+            (u'运行时长', duration),
+            (u'状态', status),
+            (u'测试人', tsname),
         ]
-        
-        stats_html = ''.join(
-            TemplateEngine.STAT_CARD_TEMPLATE % {
-                'label': s['label'],
-                'value': saxutils.escape(s['value']),
-                'card_class': s['class'],
-                'icon': s['icon'],
-            }
-            for s in stats
+
+    def generateReport(self, test, result):
+        report_attrs = self.getReportAttributes(result)
+        generator = 'HTMLTestRunner %s' % __version__
+        stylesheet = self._generate_stylesheet()
+        heading = self._generate_heading(report_attrs)
+        report = self._generate_report(result)
+        ending = self._generate_ending()
+        chart = self._generate_chart(result)
+        output = self.HTML_TMPL % dict(
+            title = saxutils.escape(self.title),
+            generator = generator,
+            stylesheet = stylesheet,
+            heading = heading,
+            report = report,
+            ending = ending,
+            chart_script = chart
         )
-        
-        return TemplateEngine.HEADING_TEMPLATE % {
-            'title': saxutils.escape(self.title),
-            'description': saxutils.escape(self.description),
-            'stats_cards': stats_html,
-            'chart_height': self.chart_height,
-            'toggle_theme': self._get_text('toggle_theme'),
-        }
+        self.stream.write(output.encode('utf8'))
 
-    def _generate_report_body(self, result: HTMLTestResult) -> str:
-        """生成报告主体"""
-        # 按类分组
-        sorted_results = self._sort_results(result.results)
+    def _generate_stylesheet(self):
+        return self.STYLESHEET_TMPL
+
+    def _generate_heading(self, report_attrs):
+        a_lines = []
+        # 为每个属性定义图标和卡片样式
+        attr_config = {
+            u'开始时间': {'icon': 'bi bi-clock-history', 'class': 'info'},
+            u'运行时长': {'icon': 'bi bi-stopwatch', 'class': 'primary'},
+            u'状态': {'icon': 'bi bi-flag-fill', 'class': 'success'},
+            u'测试人': {'icon': 'bi bi-person-fill', 'class': 'secondary'},
+        }
+        
+        for name, value in report_attrs:
+            config = attr_config.get(name, {'icon': 'bi bi-info-circle', 'class': 'info'})
+            line = self.HEADING_ATTRIBUTE_TMPL % dict(
+                name = saxutils.escape(name),
+                value = saxutils.escape(value),
+                card_class = config['class'],
+                icon = config['icon'],
+            )
+            a_lines.append(line)
+        heading = self.HEADING_TMPL % dict(
+            title = saxutils.escape(self.title),
+            parameters = ''.join(a_lines),
+            description = saxutils.escape(self.description),
+        )
+        return heading
+
+    def _generate_report(self, result):
         rows = []
-        
-        for cid, (cls, cls_results) in enumerate(sorted_results):
-            # 统计类级别数据
+        sortedResult = self.sortResult(result.result)
+        for cid, (cls, cls_results) in enumerate(sortedResult):
+            # subtotal for a class
             np = nf = ne = ns = 0
-            for status, _, _, _, _ in cls_results:
-                if status == TestStatus.PASS:
-                    np += 1
-                elif status == TestStatus.FAIL:
-                    nf += 1
-                elif status == TestStatus.ERROR:
-                    ne += 1
-                else:
-                    ns += 1
-            
-            # 类名和描述
-            name = f'{cls.__module__}.{cls.__name__}' if cls.__module__ != '__main__' else cls.__name__
-            doc = (cls.__doc__ or '').split('\n')[0]
-            desc = f'{name}: {doc}' if doc else name
-            
-            # 确定样式
-            if ne > 0:
-                style = 'errorClass'
-            elif nf > 0:
-                style = 'failClass'
-            elif ns > 0:
-                style = 'skipClass'
+            for n,t,o,e in cls_results:
+                if n == 0: np += 1
+                elif n == 1: nf += 1
+                elif n == 2: ne += 1
+                else: ns += 1
+
+            # format class description
+            if cls.__module__ == "__main__":
+                name = cls.__name__
             else:
-                style = 'passClass'
-            
-            rows.append(TemplateEngine.CLASS_ROW_TEMPLATE % {
-                'style': style,
-                'desc': saxutils.escape(desc),
-                'count': np + nf + ne + ns,
-                'pass': np,
-                'fail': nf,
-                'error': ne,
-                'skip': ns,
-                'cid': f'c{cid + 1}',
-                'detail': self._get_text('detail'),
-            })
-            
-            # 生成测试用例行
-            for tid, (status, test, output, trace, duration) in enumerate(cls_results):
-                rows.append(self._generate_test_row(cid, tid, status, test, output, trace, duration))
-        
-        # 总计行
-        total_row = TemplateEngine.TOTAL_ROW_TEMPLATE % {
-            'total_summary': self._get_text('total_summary'),
-            'count': result.total_count,
-            'pass': result.success_count,
-            'fail': result.failure_count,
-            'error': result.error_count,
-            'skip': result.skip_count,
-        }
-        
-        return TemplateEngine.REPORT_TEMPLATE % {
-            'test_details': self._get_text('test_details'),
-            'summary': self._get_text('summary'),
-            'failed': self._get_text('failed'),
-            'all': self._get_text('all'),
-            'test_suite': self._get_text('test_suite'),
-            'total': self._get_text('total'),
-            'pass': self._get_text('pass'),
-            'fail': self._get_text('fail'),
-            'error': self._get_text('error'),
-            'skip': self._get_text('skip'),
-            'view': self._get_text('view'),
-            'test_list': ''.join(rows),
-            'total_row': total_row,
-        }
+                name = "%s.%s" % (cls.__module__, cls.__name__)
+            doc = cls.__doc__ and cls.__doc__.split("\n")[0] or ""
+            desc = doc and '%s: %s' % (name, doc) or name
 
-    def _generate_test_row(
-        self,
-        cid: int,
-        tid: int,
-        status: TestStatus,
-        test: unittest.TestCase,
-        output: str,
-        trace: str,
-        duration: float
-    ) -> str:
-        """生成单个测试用例行"""
-        # ID 前缀
-        prefix_map = {TestStatus.PASS: 'p', TestStatus.FAIL: 'f', TestStatus.ERROR: 'f', TestStatus.SKIP: 's'}
-        prefix = prefix_map.get(status, 'p')
-        row_id = f'{prefix}t{cid + 1}.{tid + 1}'
-        
-        # 测试名和描述
-        name = test.id().split('.')[-1]
-        doc = test.shortDescription() or ''
-        desc = f'{name}: {doc}' if doc else name
-        
-        # 样式
-        style_map = {
-            TestStatus.PASS: 'none',
-            TestStatus.FAIL: 'failCase',
-            TestStatus.ERROR: 'errorCase',
-            TestStatus.SKIP: 'skipCase',
-        }
-        
-        # 输出内容
-        content = output + trace if (output or trace) else self._get_text('no_output')
-        
-        return TemplateEngine.TEST_ROW_TEMPLATE % {
-            'tid': row_id,
-            'style': style_map.get(status, 'none'),
-            'desc': saxutils.escape(desc),
-            'status': STATUS_LABELS.get(status, ''),
-            'execution_details': self._get_text('execution_details'),
-            'copy': self._get_text('copy'),
-            'script': saxutils.escape(f'{row_id}: {content}'),
-        }
+            row = self.REPORT_CLASS_TMPL % dict(
+                style = ne > 0 and 'errorClass' or nf > 0 and 'failClass' or ns > 0 and 'skipClass' or 'passClass',
+                desc = desc,
+                count = np+nf+ne+ns,
+                Pass = np,
+                fail = nf,
+                error = ne,
+                skip = ns,
+                cid = 'c%s' % (cid+1),
+            )
+            rows.append(row)
 
-    def _generate_ending(self) -> str:
-        """生成页脚"""
-        return TemplateEngine.ENDING_TEMPLATE % {
-            'powered_by': self._get_text('powered_by'),
-            'version': __version__,
-            'tester': self.tester,
-            'generated_on': self._get_text('generated_on'),
-            'time': self.stop_time.strftime('%Y-%m-%d %H:%M:%S') if self.stop_time else '',
-        }
+            for tid, (n,t,o,e) in enumerate(cls_results):
+                self._generate_report_test(rows, cid, tid, n, t, o, e)
 
-    def _generate_chart_script(self, result: HTMLTestResult) -> str:
-        """生成图表脚本"""
-        return TemplateEngine.CHART_SCRIPT_TEMPLATE % {
-            'pass': result.success_count,
-            'fail': result.failure_count,
-            'error': result.error_count,
-            'skip': result.skip_count,
-            'test_execution': self._get_text('test_execution'),
-            'pass_rate': self._get_text('pass_rate'),
-            'pass_label': self._get_text('pass'),
-            'fail_label': self._get_text('fail'),
-            'error_label': self._get_text('error'),
-            'skip_label': self._get_text('skip'),
-        }
+        report = self.REPORT_TMPL % dict(
+            test_list = ''.join(rows),
+            count = str(result.success_count+result.failure_count+result.error_count+result.skip_count),
+            Pass = str(result.success_count),
+            fail = str(result.failure_count),
+            error = str(result.error_count),
+            skip = str(result.skip_count),
+        )
+        return report
 
-    def _sort_results(self, results: List) -> List:
-        """按测试类分组排序"""
-        class_map = {}
-        class_order = []
+    def _generate_chart(self, result):
+        chart = self.ECHARTS_SCRIPT % dict(
+            Pass=str(result.success_count),
+            fail=str(result.failure_count),
+            error=str(result.error_count),
+            skip=str(result.skip_count),
+        )
+        return chart
+
+    def _generate_report_test(self, rows, cid, tid, n, t, o, e):
+        # e.g. 'pt1.1', 'ft1.1', 'st1.1', etc
+        # n == 0: pass, 1: fail, 2: error, 3: skip
+        if n == 0:
+            prefix = 'p'
+        elif n == 3:
+            prefix = 's'
+        else:
+            prefix = 'f'
+        tid = prefix + 't%s.%s' % (cid+1,tid+1)
+        name = t.id().split('.')[-1]
+        doc = t.shortDescription() or ""
+        desc = doc and ('%s: %s' % (name, doc)) or name
         
-        for item in results:
-            status, test, output, trace, duration = item
-            cls = test.__class__
-            if cls not in class_map:
-                class_map[cls] = []
-                class_order.append(cls)
-            class_map[cls].append(item)
-        
-        return [(cls, class_map[cls]) for cls in class_order]
+        # 所有测试用例都使用WITH_OUTPUT模板，即使没有输出也显示详情按钮
+        tmpl = self.REPORT_TEST_WITH_OUTPUT_TMPL
+
+        script = self.REPORT_TEST_OUTPUT_TMPL % dict(
+            id=tid,
+            output=saxutils.escape(o+e) if (o or e) else '无输出信息',
+        )
+
+        if n == 0:
+            style = 'none'
+            badge = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> %s</span>' % self.STATUS[n]
+        elif n == 1:
+            style = 'failCase'
+            badge = '<span class="badge bg-warning"><i class="bi bi-x-lg"></i> %s</span>' % self.STATUS[n]
+        elif n == 2:
+            style = 'errorCase'
+            badge = '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill"></i> %s</span>' % self.STATUS[n]
+        else:  # n == 3 (skip)
+            style = 'skipCase'
+            badge = '<span class="badge bg-primary"><i class="bi bi-dash-circle"></i> %s</span>' % self.STATUS[n]
+
+        row = tmpl % dict(
+            tid=tid,
+            Class=(n == 0 and 'hiddenRow' or 'none'),
+            style=style,
+            desc=desc,
+            script=script,
+            status=self.STATUS[n],
+            badge=badge,
+        )
+        rows.append(row)
+
+    def _generate_ending(self):
+        return self.ENDING_TMPL
 
 
-# ============================================================================
-# Command Line Support
-# ============================================================================
+##############################################################################
+# Facilities for running tests from the command line
+##############################################################################
 
+# Note: Reuse unittest.TestProgram to launch test. In the future we may
+# build our own launcher to support more specific command line
+# parameters like test title, CSS, etc.
 class TestProgram(unittest.TestProgram):
-    """命令行测试程序"""
-    
+    """
+    A variation of the unittest.TestProgram. Please refer to the base
+    class for command line parameters.
+    """
     def runTests(self):
+        # Pick HTMLTestRunner as the default test runner.
+        # base class's testRunner parameter is not useful because it means
+        # we have to instantiate HTMLTestRunner before we know self.verbosity.
         if self.testRunner is None:
             self.testRunner = HTMLTestRunner(verbosity=self.verbosity)
         unittest.TestProgram.runTests(self)
 
-
 main = TestProgram
 
+##############################################################################
+# Executing this module from the command line
+##############################################################################
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(module=None)
-

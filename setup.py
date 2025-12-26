@@ -8,7 +8,7 @@ setup(
     name="htmltestrunner-modern",
     version="1.0.0",
     author="Lit",
-    author_email="limin.cao@item.local",
+    author_email="lit@lit.local",
     description="现代化的 Python unittest HTML 测试报告生成器",
     long_description=long_description,
     long_description_content_type="text/markdown",

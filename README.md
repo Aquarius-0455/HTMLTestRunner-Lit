@@ -1,4 +1,4 @@
-# HTMLTestRunner Modern 🎨
+# HTMLTestRunner Lit 🎨
 
 现代化的 Python unittest HTML 测试报告生成器
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "htmltestrunner-lit"
-version = "1.0.1"
+version = "1.0.2"
 description = "现代化的 Python unittest HTML 测试报告生成器"
 readme = "README.md"
 license = {text = "MIT"}

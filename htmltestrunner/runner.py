@@ -1257,7 +1257,7 @@ class _TestResult(TestResult):
                     sys.stderr.write('E  ')
                     sys.stderr.write(str(subtest))
                     sys.stderr.write('\n')
-        else:
+                else:
                     sys.stderr.write('E')
             self._mirrorOutput = True
         else:
@@ -1266,12 +1266,12 @@ class _TestResult(TestResult):
             self.success_count += 1
             output = self.complete_output()
             self.result.append((0, test, output + '\nSubTestCase Pass:\n' + str(subtest), ''))
-        if self.verbosity > 1:
+            if self.verbosity > 1:
                 sys.stderr.write('ok ')
                 sys.stderr.write(str(subtest))
                 sys.stderr.write('\n')
-        else:
-                sys.stderr.write('../HTTP_TestRunner')
+            else:
+                sys.stderr.write('S')
 
 
 class HTMLTestRunner(Template_mixin):
@@ -1287,11 +1287,11 @@ class HTMLTestRunner(Template_mixin):
         if description is None:
             self.description = self.DEFAULT_DESCRIPTION
         else:
-        self.description = description
+            self.description = description
         if tester is None:
             self.tester = "QA Team"
         else:
-        self.tester = tester
+            self.tester = tester
 
         self.startTime = datetime.datetime.now()
         

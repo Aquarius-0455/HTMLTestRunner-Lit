@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="htmltestrunner-lit",
-    version="1.0.4.post1",
+    version="1.0.5",
     author="Lit",
     description="现代化的 Python unittest HTML 测试报告生成器",
     long_description=long_description,

@@ -13,6 +13,7 @@
 
 - 🎨 **Bootstrap 5 + ECharts 5** 现代 UI 设计
 - 🌓 **深色/浅色主题** 一键切换
+- 📸 **截图支持** 自动捕获 Selenium 截图，支持轮播/网格预览
 - 📱 **响应式设计** 完美支持移动端
 - 📊 **环形图表** 可视化展示通过率
 - 📋 **测试详情** 支持复制、展开/折叠
@@ -77,6 +78,31 @@ runner = HTMLTestRunner(
 )
 ```
 
+## 📸 截图功能
+
+在测试用例中导入并调用 `attach_screenshot` 即可将截图添加到报告中。
+
+```python
+import unittest
+from selenium import webdriver
+from htmltestrunner import attach_screenshot
+
+class TestDemo(unittest.TestCase):
+    def setUp(self):
+        self.driver = webdriver.Chrome()
+    
+    def test_example(self):
+        self.driver.get("https://www.baidu.com")
+        
+        # 关键步骤：调用 attach_screenshot 并传入 driver 对象
+        attach_screenshot(self.driver, "页面截图描述")
+    
+    def tearDown(self):
+        self.driver.quit()
+```
+
+
+
 ## 🎨 主题配置
 
 支持深色和浅色两种主题，用户可以在报告中手动切换。
@@ -104,7 +130,9 @@ runner = HTMLTestRunner(
 
 ## 📝 更新日志
 
-### v1.0.4
+### v1.0.5
+- 📸 新增截图轮播与网格视图，支持多图自动切换
+- 🔍 优化大图预览体验，支持键盘/点击左右切换
 - 🎨 全新 Bootstrap 5 + ECharts 5 UI
 - 🌓 深色/浅色主题切换
 - 📱 响应式设计，完美支持移动端

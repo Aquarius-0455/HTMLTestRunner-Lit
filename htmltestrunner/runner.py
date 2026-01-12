@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __author__ = "Lit"
-__version__ = "1.0.3"
+__version__ = "1.0.5"
 
 """
 Version 1.0.0
@@ -28,6 +28,8 @@ import time
 import webbrowser
 import unittest
 from xml.sax import saxutils
+import base64
+from io import BytesIO
 
 
 # ------------------------------------------------------------------------
@@ -57,6 +59,99 @@ class OutputRedirector(object):
 
 stdout_redirector = OutputRedirector(sys.stdout)
 stderr_redirector = OutputRedirector(sys.stderr)
+
+
+# ------------------------------------------------------------------------
+# Screenshot Manager
+#
+
+class ScreenshotManager:
+    """截图管理器 - 负责将各种格式的图片转换为 base64"""
+    
+    @staticmethod
+    def to_base64(image_source, description=""):
+        """
+        将图片转换为 base64 格式
+        
+        参数:
+            image_source: 支持以下类型
+                - str: 文件路径
+                - bytes: 图片二进制数据  
+                - PIL.Image: PIL 图片对象
+                - selenium.webdriver: Selenium WebDriver 对象
+            description: 截图描述
+            
+        返回:
+            dict: {'data': base64_string, 'description': description}
+            None: 转换失败
+        """
+        try:
+            # 1. 处理文件路径
+            if isinstance(image_source, str):
+                if os.path.exists(image_source):
+                    with open(image_source, 'rb') as f:
+                        img_data = f.read()
+                    return {
+                        'data': base64.b64encode(img_data).decode('utf-8'),
+                        'description': description or os.path.basename(image_source)
+                    }
+            
+            # 2. 处理 bytes
+            elif isinstance(image_source, bytes):
+                return {
+                    'data': base64.b64encode(image_source).decode('utf-8'),
+                    'description': description or 'Screenshot'
+                }
+            
+            # 3. 处理 PIL Image
+            elif hasattr(image_source, 'save'):
+                buffer = BytesIO()
+                image_source.save(buffer, format='PNG')
+                img_data = buffer.getvalue()
+                return {
+                    'data': base64.b64encode(img_data).decode('utf-8'),
+                    'description': description or 'PIL Image'
+                }
+            
+            # 4. 处理 Selenium WebDriver
+            elif hasattr(image_source, 'get_screenshot_as_png'):
+                img_data = image_source.get_screenshot_as_png()
+                return {
+                    'data': base64.b64encode(img_data).decode('utf-8'),
+                    'description': description or 'Selenium Screenshot'
+                }
+                
+        except Exception as e:
+            sys.stderr.write(f"截图转换失败: {e}\n")
+            return None
+        
+        return None
+
+
+# 全局变量，用于存储当前的 TestResult 实例
+_current_result = None
+
+
+def attach_screenshot(image_source, description=""):
+    """
+    全局函数：在测试用例中添加截图
+    
+    使用示例:
+        from htmltestrunner import attach_screenshot
+        
+        # Selenium 截图
+        attach_screenshot(driver, "登录页面")
+        
+        # 文件路径
+        attach_screenshot("/path/to/image.png", "错误截图")
+        
+        # PIL Image
+        attach_screenshot(pil_image, "处理后的图片")
+    """
+    if _current_result:
+        _current_result.attach_screenshot(image_source, description)
+    else:
+        sys.stderr.write("警告: 无法添加截图，测试未在运行中\n")
 
 
 # ----------------------------------------------------------------------
@@ -916,6 +1011,301 @@ body {
     [data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.3);
 }
+
+    /* 截图样式 */
+    .screenshot-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .screenshot-header {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text-color);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .screenshot-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .screenshot-view-toggle {
+        display: flex;
+        gap: 4px;
+    }
+
+    .screenshot-view-btn {
+        padding: 2px 8px;
+        font-size: 12px;
+        border: 1px solid var(--border-color);
+        background: white;
+        color: var(--text-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    [data-bs-theme="dark"] .screenshot-view-btn {
+        background: #1f1f1f;
+    }
+
+    .screenshot-view-btn:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .screenshot-view-btn.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+    }
+
+    /* 轮播模式 */
+    .screenshot-carousel {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+
+    [data-bs-theme="dark"] .screenshot-carousel {
+        background: #141414;
+    }
+
+    .screenshot-carousel-inner {
+        display: flex;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .screenshot-carousel-item {
+        min-width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .screenshot-carousel-item img {
+        max-width: 100%;
+        max-height: 500px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+    }
+
+    .screenshot-carousel-description {
+        margin-top: 12px;
+        font-size: 14px;
+        color: var(--text-color);
+        text-align: center;
+    }
+
+    .screenshot-carousel-control {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #555;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10;
+        opacity: 0;
+        transition: all 0.3s;
+    }
+
+    .screenshot-carousel:hover .screenshot-carousel-control {
+        opacity: 1;
+    }
+
+    .screenshot-carousel-control:hover {
+        background: #fff;
+        color: var(--primary-color);
+        transform: translateY(-50%) scale(1.1);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+
+    .screenshot-carousel-control.prev { left: 20px; }
+    .screenshot-carousel-control.next { right: 20px; }
+
+    .screenshot-carousel-indicators {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .screenshot-carousel-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .screenshot-carousel-indicator.active {
+        background: var(--primary-color);
+        width: 24px;
+        border-radius: 4px;
+    }
+
+    /* 网格模式 */
+    .screenshot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 16px;
+    }
+
+    .screenshot-item {
+        margin-bottom: 0;
+    }
+
+    .screenshot-description {
+        font-size: 13px;
+        color: #8c8c8c;
+        margin-bottom: 8px;
+        font-style: italic;
+    }
+
+    .screenshot-image {
+        max-width: 100%;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .screenshot-image:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    /* 图片预览模态框 */
+    .image-modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        animation: fadeIn 0.3s;
+    }
+
+    .image-modal-content {
+        margin: auto;
+        display: block;
+        max-width: 90%;
+        max-height: 90%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: zoomIn 0.3s;
+    }
+
+    .image-modal-caption {
+        text-align: center;
+        color: #fff;
+        padding: 10px;
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 16px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 4px;
+        padding: 8px 16px;
+    }
+
+    .image-modal-close {
+        position: absolute;
+        top: 30px;
+        right: 30px;
+        width: 50px;
+        height: 50px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+        z-index: 10002;
+    }
+
+    .image-modal-close:hover {
+        background: transparent;
+        color: #ff4d4f;
+        transform: rotate(90deg);
+    }
+
+    .image-modal-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 50px;
+        font-weight: bold;
+        cursor: pointer;
+        padding: 0 20px;
+        user-select: none;
+        transition: all 0.3s;
+        z-index: 10001;
+        height: 100%;
+        display: flex;
+        align-items: center;
+    }
+
+    .image-modal-nav:hover {
+        color: #fff;
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .image-modal-prev { left: 0; }
+    .image-modal-next { right: 0; }
+
+    .image-modal-counter {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 4px 10px;
+        border-radius: 4px;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes zoomIn {
+        from { transform: translate(-50%, -50%) scale(0.8); }
+        to { transform: translate(-50%, -50%) scale(1); }
+    }
 </style>
 """
 
@@ -1074,13 +1464,70 @@ body {
             </div>
             <div class="popup_window_content">
                 <pre id='content_%(tid)s'>%(script)s</pre>
+                %(screenshots)s
             </div>
         </div>
     </td>
 </tr>
-"""  # variables: (tid, Class, style, desc, status)
+"""  # variables: (tid, Class, style, desc, status, screenshots)
 
     REPORT_TEST_OUTPUT_TMPL = r"""%(id)s: %(output)s"""  # variables: (id, output)
+
+    SCREENSHOT_TMPL = """
+    <div class="screenshot-container mt-3" id="screenshot-%(tid)s">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-card-image"></i> 截图 (%(count)s)</h6>
+            <div class="screenshot-view-toggle" style="%(toggle_style)s">
+                <button class="btn btn-sm btn-outline-secondary screenshot-view-btn %(btn_carousel_active)s" onclick="switchScreenshotView('%(tid)s', 'carousel')" title="轮播视图">
+                    <i class="bi bi-collection-play"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary screenshot-view-btn %(btn_grid_active)s" onclick="switchScreenshotView('%(tid)s', 'grid')" title="网格视图">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 轮播视图 -->
+        <div class="screenshot-carousel" id="carousel-%(tid)s" style="%(carousel_style)s">
+            <div class="screenshot-carousel-inner" id="carousel-inner-%(tid)s">
+                %(carousel_items)s
+            </div>
+            <button class="screenshot-carousel-control prev" onclick="moveCarousel('%(tid)s', -1)">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="screenshot-carousel-control next" onclick="moveCarousel('%(tid)s', 1)">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <div class="screenshot-carousel-indicators" id="indicators-%(tid)s">
+                %(indicators)s
+            </div>
+        </div>
+        
+        <!-- 网格视图 -->
+        <div class="screenshot-grid" id="grid-%(tid)s" style="%(grid_style)s">
+            %(grid_items)s
+        </div>
+    </div>
+    """
+
+    SCREENSHOT_CAROUSEL_ITEM_TMPL = """
+<div class="screenshot-carousel-item">
+    <img src="data:image/png;base64,%(data)s" 
+         alt="%(description)s"
+         onclick="openImageModal('%(tid)s', %(index)s)">
+    <div class="screenshot-carousel-description">%(description)s</div>
+</div>
+"""
+
+    SCREENSHOT_GRID_ITEM_TMPL = """
+<div class="screenshot-item">
+    <div class="screenshot-description">%(description)s</div>
+    <img src="data:image/png;base64,%(data)s" 
+         alt="%(description)s" 
+         class="screenshot-image"
+         onclick="openImageModal('%(tid)s', %(index)s)">
+</div>
+"""
 
     # ------------------------------------------------------------------------
     # ENDING
@@ -1091,7 +1538,7 @@ body {
         <div class='card' style='background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);'>
             <p class='text-muted mb-2'>
         <i class="bi bi-code-square"></i>
-                Powered by <strong>HTMLTestRunner</strong> v1.0.0 - Modern UI Edition
+                Powered by <strong>HTMLTestRunner</strong> v1.0.5 - Modern UI Edition
     </p>
             <p class='text-muted mb-2' style='font-size: 0.875rem;'>
         <i class="bi bi-person-circle"></i>
@@ -1113,6 +1560,172 @@ body {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
+    });
+
+    // 图片预览模态框功能 - 支持轮播
+    let currentModalImages = [];
+    let currentModalIndex = 0;
+
+    function openImageModal(tid, index) {
+        // 1. 收集该组的所有图片信息
+        const gridContainer = document.getElementById('grid-' + tid);
+        if (!gridContainer) return;
+        
+        const imgs = gridContainer.querySelectorAll('img');
+        currentModalImages = Array.from(imgs).map(img => ({
+            src: img.src,
+            description: img.getAttribute('alt') || ''
+        }));
+        currentModalIndex = index;
+        
+        let modal = document.getElementById('imageModal');
+        if (!modal) {
+            // 创建模态框 DOM
+            const modalHtml = `
+                <div id="imageModal" class="image-modal">
+                    <div class="image-modal-close" onclick="closeImageModal()">
+                        <i class="bi bi-x-lg"></i>
+                    </div>
+                    <div class="image-modal-nav image-modal-prev" onclick="changeModalImage(-1)">
+                        <i class="bi bi-chevron-left"></i>
+                    </div>
+                    <div class="image-modal-nav image-modal-next" onclick="changeModalImage(1)">
+                        <i class="bi bi-chevron-right"></i>
+                    </div>
+                    <div class="image-modal-counter" id="modalCounter"></div>
+                    <img class="image-modal-content" id="modalImage">
+                    <div class="image-modal-caption" id="modalCaption"></div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            modal = document.getElementById('imageModal');
+            
+            // 点击背景关闭
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closeImageModal();
+            });
+        }
+        
+        updateModalContent();
+        modal.style.display = 'block';
+    }
+
+    function updateModalContent() {
+        if (!currentModalImages.length) return;
+        
+        const data = currentModalImages[currentModalIndex];
+        const img = document.getElementById('modalImage');
+        const caption = document.getElementById('modalCaption');
+        const counter = document.getElementById('modalCounter');
+        
+        img.src = data.src;
+        caption.textContent = data.description;
+        counter.textContent = `${currentModalIndex + 1} / ${currentModalImages.length}`;
+    }
+
+    function changeModalImage(direction) {
+        currentModalIndex += direction;
+        if (currentModalIndex < 0) {
+            currentModalIndex = currentModalImages.length - 1;
+        } else if (currentModalIndex >= currentModalImages.length) {
+            currentModalIndex = 0;
+        }
+        updateModalContent();
+    }
+
+    function closeImageModal() {
+        const modal = document.getElementById('imageModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // 键盘事件：ESC关闭，左右键切换
+    document.addEventListener('keydown', function(event) {
+        const modal = document.getElementById('imageModal');
+        if (modal && modal.style.display === 'block') {
+            if (event.key === 'Escape') {
+                closeImageModal();
+            } else if (event.key === 'ArrowLeft') {
+                changeModalImage(-1);
+            } else if (event.key === 'ArrowRight') {
+                changeModalImage(1);
+            }
+        }
+    });
+
+    // 截图轮播功能
+    const carouselStates = {};  // 存储每个轮播的当前索引
+
+    function switchScreenshotView(tid, view) {
+        const carousel = document.getElementById('carousel-' + tid);
+        const grid = document.getElementById('grid-' + tid);
+        const section = document.getElementById('screenshot-' + tid);
+        const buttons = section.querySelectorAll('.screenshot-view-btn');
+        
+        buttons.forEach(btn => btn.classList.remove('active'));
+        
+        if (view === 'carousel') {
+            carousel.style.display = 'block';
+            grid.style.display = 'none';
+            buttons[0].classList.add('active');
+        } else {
+            carousel.style.display = 'none';
+            grid.style.display = 'grid';
+            buttons[1].classList.add('active');
+        }
+    }
+
+    function moveCarousel(tid, direction) {
+        if (!carouselStates[tid]) {
+            carouselStates[tid] = 0;
+        }
+        
+        const inner = document.getElementById('carousel-inner-' + tid);
+        const items = inner.children;
+        const totalItems = items.length;
+        
+        carouselStates[tid] += direction;
+        
+        if (carouselStates[tid] < 0) {
+            carouselStates[tid] = totalItems - 1;
+        } else if (carouselStates[tid] >= totalItems) {
+            carouselStates[tid] = 0;
+        }
+        
+        updateCarousel(tid);
+    }
+
+    function goToSlide(tid, index) {
+        carouselStates[tid] = index;
+        updateCarousel(tid);
+    }
+
+    function updateCarousel(tid) {
+        const inner = document.getElementById('carousel-inner-' + tid);
+        const indicatorsContainer = document.getElementById('indicators-' + tid);
+        const indicators = indicatorsContainer.querySelectorAll('.screenshot-carousel-indicator');
+        const currentIndex = carouselStates[tid] || 0;
+        
+        inner.style.transform = `translateX(-${currentIndex * 100}%)`;
+        
+        indicators.forEach((indicator, index) => {
+            if (index === currentIndex) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        });
+    }
+
+    // 初始化所有轮播
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.screenshot-carousel').forEach(carousel => {
+            const tid = carousel.id.replace('carousel-', '');
+            if (!carouselStates[tid]) {
+                carouselStates[tid] = 0;
+            }
+        });
     });
     </script>
     """
@@ -1143,14 +1756,17 @@ class _TestResult(TestResult):
         #   TestCase object,
         #   Test output (byte string),
         #   stack trace,
+        #   screenshots,  # 新增：截图列表
         # )
         self.result = []
         self.subtestlist = []
         self.outputBuffer = io.StringIO()
         self.test_start_time = round(time.time(), 2)
+        self.current_screenshots = []  # 新增：当前测试的截图列表
 
     def startTest(self, test):
         TestResult.startTest(self, test)
+        self.current_screenshots = []  # 新增：重置截图列表
         # just one buffer for both stdout and stderr
         self.outputBuffer = io.StringIO()
         stdout_redirector.fp = self.outputBuffer
@@ -1159,6 +1775,12 @@ class _TestResult(TestResult):
         self.stderr0 = sys.stderr
         sys.stdout = stdout_redirector
         sys.stderr = stderr_redirector
+
+    def attach_screenshot(self, image_source, description=""):
+        """添加截图到当前测试"""
+        screenshot = ScreenshotManager.to_base64(image_source, description)
+        if screenshot:
+            self.current_screenshots.append(screenshot)
 
     def complete_output(self):
         """
@@ -1183,7 +1805,7 @@ class _TestResult(TestResult):
             self.success_count += 1
             TestResult.addSuccess(self, test)
             output = self.complete_output()
-            self.result.append((0, test, output, ''))
+            self.result.append((0, test, output, '', self.current_screenshots[:]))
             if self.verbosity > 1:
                 sys.stderr.write('ok ')
                 sys.stderr.write(str(test))
@@ -1196,7 +1818,7 @@ class _TestResult(TestResult):
         TestResult.addError(self, test, err)
         _, _exc_str = self.errors[-1]
         output = self.complete_output()
-        self.result.append((2, test, output, _exc_str))
+        self.result.append((2, test, output, _exc_str, self.current_screenshots[:]))
         if self.verbosity > 1:
             sys.stderr.write('E  ')
             sys.stderr.write(str(test))
@@ -1209,7 +1831,7 @@ class _TestResult(TestResult):
         TestResult.addFailure(self, test, err)
         _, _exc_str = self.failures[-1]
         output = self.complete_output()
-        self.result.append((1, test, output, _exc_str))
+        self.result.append((1, test, output, _exc_str, self.current_screenshots[:]))
         if self.verbosity > 1:
             sys.stderr.write('F  ')
             sys.stderr.write(str(test))
@@ -1221,7 +1843,7 @@ class _TestResult(TestResult):
         self.skip_count += 1
         TestResult.addSkip(self, test, reason)
         output = self.complete_output()
-        self.result.append((3, test, output, 'Skipped: ' + reason))
+        self.result.append((3, test, output, 'Skipped: ' + reason, self.current_screenshots[:]))
         if self.verbosity > 1:
             sys.stderr.write('SKIP ')
             sys.stderr.write(str(test))
@@ -1239,7 +1861,7 @@ class _TestResult(TestResult):
                 errors.append((subtest, self._exc_info_to_string(err, subtest)))
                 output = self.complete_output()
                 self.result.append((1, test, output + '\nSubTestCase Failed:\n' + str(subtest),
-                                    self._exc_info_to_string(err, subtest)))
+                                    self._exc_info_to_string(err, subtest), self.current_screenshots[:]))
                 if self.verbosity > 1:
                     sys.stderr.write('F  ')
                     sys.stderr.write(str(subtest))
@@ -1252,7 +1874,7 @@ class _TestResult(TestResult):
                 errors.append((subtest, self._exc_info_to_string(err, subtest)))
                 output = self.complete_output()
                 self.result.append(
-                    (2, test, output + '\nSubTestCase Error:\n' + str(subtest), self._exc_info_to_string(err, subtest)))
+                    (2, test, output + '\nSubTestCase Error:\n' + str(subtest), self._exc_info_to_string(err, subtest), self.current_screenshots[:]))
                 if self.verbosity > 1:
                     sys.stderr.write('E  ')
                     sys.stderr.write(str(subtest))
@@ -1265,7 +1887,7 @@ class _TestResult(TestResult):
             self.subtestlist.append(test)
             self.success_count += 1
             output = self.complete_output()
-            self.result.append((0, test, output + '\nSubTestCase Pass:\n' + str(subtest), ''))
+            self.result.append((0, test, output + '\nSubTestCase Pass:\n' + str(subtest), '', self.current_screenshots[:]))
             if self.verbosity > 1:
                 sys.stderr.write('ok ')
                 sys.stderr.write(str(subtest))
@@ -1297,8 +1919,11 @@ class HTMLTestRunner(Template_mixin):
         
     def run(self, test):
         "Run the given test case or test suite."
+        global _current_result
         result = _TestResult(self.verbosity)
+        _current_result = result  # 新增：设置全局引用
         test(result)
+        _current_result = None  # 新增：清除全局引用
         self.stopTime = datetime.datetime.now()
         self.generateReport(test, result)
         print('\nTime 运行时长: %s' % (self.stopTime-self.startTime), file=sys.stderr)
@@ -1316,12 +1941,13 @@ class HTMLTestRunner(Template_mixin):
         # Here at least we want to group them together by class.
         rmap = {}
         classes = []
-        for n,t,o,e in result_list:
+        for n,t,o,e,*screenshots_list in result_list:
             cls = t.__class__
             if cls not in rmap:
                 rmap[cls] = []
                 classes.append(cls)
-            rmap[cls].append((n,t,o,e))
+            screenshots = screenshots_list[0] if screenshots_list else []
+            rmap[cls].append((n,t,o,e,screenshots))
         r = [(cls, rmap[cls]) for cls in classes]
         return r
 
@@ -1402,7 +2028,7 @@ class HTMLTestRunner(Template_mixin):
         for cid, (cls, cls_results) in enumerate(sortedResult):
             # subtotal for a class
             np = nf = ne = ns = 0
-            for n,t,o,e in cls_results:
+            for n,t,o,e,*screenshots_list in cls_results:
                 if n == 0: np += 1
                 elif n == 1: nf += 1
                 elif n == 2: ne += 1
@@ -1428,8 +2054,9 @@ class HTMLTestRunner(Template_mixin):
             )
             rows.append(row)
 
-            for tid, (n,t,o,e) in enumerate(cls_results):
-                self._generate_report_test(rows, cid, tid, n, t, o, e)
+            for tid, (n,t,o,e,*screenshots_list) in enumerate(cls_results):
+                screenshots = screenshots_list[0] if screenshots_list else []
+                self._generate_report_test(rows, cid, tid, n, t, o, e, screenshots)
 
         report = self.REPORT_TMPL % dict(
             test_list = ''.join(rows),
@@ -1450,7 +2077,7 @@ class HTMLTestRunner(Template_mixin):
         )
         return chart
 
-    def _generate_report_test(self, rows, cid, tid, n, t, o, e):
+    def _generate_report_test(self, rows, cid, tid, n, t, o, e, screenshots=None):
         # e.g. 'pt1.1', 'ft1.1', 'st1.1', etc
         # n == 0: pass, 1: fail, 2: error, 3: skip
         if n == 0:
@@ -1472,6 +2099,68 @@ class HTMLTestRunner(Template_mixin):
             output=saxutils.escape(o+e) if (o or e) else '无输出信息',
         )
 
+        # 生成截图 HTML
+        screenshot_html = ''
+        if screenshots and len(screenshots) > 0:
+            count = len(screenshots)
+            
+            # 判断默认视图：2张及以上使用轮播，否则使用网格
+            if count >= 2:
+                default_view = 'carousel'
+                toggle_style = ''
+                carousel_style = 'display: block;'
+                grid_style = 'display: none;'
+                btn_carousel_active = 'active'
+                btn_grid_active = ''
+            else:
+                default_view = 'grid'
+                toggle_style = ''
+                carousel_style = 'display: none;'
+                grid_style = 'display: grid;'
+                btn_carousel_active = ''
+                btn_grid_active = 'active'
+
+            # 生成轮播项
+            carousel_items = []
+            for i, screenshot in enumerate(screenshots):
+                item = self.SCREENSHOT_CAROUSEL_ITEM_TMPL % {
+                    'data': screenshot['data'],
+                    'description': saxutils.escape(screenshot['description']),
+                    'tid': tid,
+                    'index': i
+                }
+                carousel_items.append(item)
+            
+            # 生成网格项
+            grid_items = []
+            for i, screenshot in enumerate(screenshots):
+                item = self.SCREENSHOT_GRID_ITEM_TMPL % {
+                    'data': screenshot['data'],
+                    'description': saxutils.escape(screenshot['description']),
+                    'tid': tid,
+                    'index': i
+                }
+                grid_items.append(item)
+            
+            # 生成指示器
+            indicators = []
+            for i in range(len(screenshots)):
+                active_class = 'active' if i == 0 else ''
+                indicators.append(f'<div class="screenshot-carousel-indicator {active_class}" onclick="goToSlide(\'{tid}\', {i})"></div>')
+            
+            screenshot_html = self.SCREENSHOT_TMPL % {
+                'tid': tid,
+                'count': count,
+                'toggle_style': toggle_style,
+                'carousel_style': carousel_style,
+                'grid_style': grid_style,
+                'btn_carousel_active': btn_carousel_active,
+                'btn_grid_active': btn_grid_active,
+                'carousel_items': ''.join(carousel_items),
+                'grid_items': ''.join(grid_items),
+                'indicators': ''.join(indicators)
+            }
+
         if n == 0:
             style = 'none'
             badge = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> %s</span>' % self.STATUS[n]
@@ -1492,7 +2181,7 @@ class HTMLTestRunner(Template_mixin):
             desc=desc,
             script=script,
             status=self.STATUS[n],
-            badge=badge,
+            screenshots=screenshot_html,
         )
         rows.append(row)
 

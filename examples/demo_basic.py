@@ -68,15 +68,15 @@ if __name__ == '__main__':
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestMath))
     
     # 生成报告
-    with open('demo_report.html', 'wb') as f:
+    with open('report_basic.html', 'wb') as f:
         runner = HTMLTestRunner(
             stream=f,
-            title='HTMLTestRunner Modern 演示报告',
-            description='这是一个演示测试报告，展示 HTMLTestRunner 的各种功能',
+            title='HTMLTestRunner Modern 基础演示',
+            description='这是一个演示测试报告，展示 HTMLTestRunner 的基础功能',
             tester='Lit',
             open_in_browser=True  # 测试完成后自动打开报告
         )
         runner.run(suite)
     
-    print("\n报告已生成: demo_report.html")
+    print("\n报告已生成: report_basic.html")
 

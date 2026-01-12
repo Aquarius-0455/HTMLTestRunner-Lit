@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __author__ = "Lit"
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 """
 Version 1.0.0
@@ -1896,7 +1896,7 @@ class _TestResult(TestResult):
                 sys.stderr.write('S')
 
 
-class HTMLTestRunner(Template_mixin):
+class HTMLTestRunnerLit(Template_mixin):
 
     def __init__(self, stream=sys.stdout, verbosity=1, title=None, description=None, tester=None, open_in_browser=False):
         self.stream = stream
@@ -2206,7 +2206,7 @@ class TestProgram(unittest.TestProgram):
         # base class's testRunner parameter is not useful because it means
         # we have to instantiate HTMLTestRunner before we know self.verbosity.
         if self.testRunner is None:
-            self.testRunner = HTMLTestRunner(verbosity=self.verbosity)
+            self.testRunner = HTMLTestRunnerLit(verbosity=self.verbosity)
         unittest.TestProgram.runTests(self)
 
 main = TestProgram

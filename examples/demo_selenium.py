@@ -19,7 +19,7 @@ from time import sleep
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from htmltestrunner import HTMLTestRunner, attach_screenshot
+from htmltestrunner import HTMLTestRunnerLit, attach_screenshot
 
 
 class TestBaidu(unittest.TestCase):
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     
     # 生成报告
     with open('report_selenium.html', 'wb') as f:
-        runner = HTMLTestRunner(
+        runner = HTMLTestRunnerLit(
             stream=f,
             title='Selenium 测试报告',
             description='Selenium 自动化测试与截图演示',

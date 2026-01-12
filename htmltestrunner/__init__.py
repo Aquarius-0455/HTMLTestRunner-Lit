@@ -3,8 +3,8 @@
 HTMLTestRunner PY3 - 现代化的 Python 测试报告生成器
 """
 
-from .runner import HTMLTestRunner, attach_screenshot
+from .runner import HTMLTestRunnerLit, attach_screenshot
 
-__version__ = "1.0.3"
+__version__ = "1.0.6"
 __author__ = "Lit"
-__all__ = ["HTMLTestRunner", "attach_screenshot"]
+__all__ = ["HTMLTestRunnerLit", "attach_screenshot"]

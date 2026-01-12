@@ -10,7 +10,7 @@ import os
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from htmltestrunner import HTMLTestRunner
+from htmltestrunner import HTMLTestRunnerLit
 
 
 class TestExample(unittest.TestCase):
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     
     # 生成报告
     with open('report_basic.html', 'wb') as f:
-        runner = HTMLTestRunner(
+        runner = HTMLTestRunnerLit(
             stream=f,
             title='HTMLTestRunner Modern 基础演示',
             description='这是一个演示测试报告，展示 HTMLTestRunner 的基础功能',

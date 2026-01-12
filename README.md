@@ -49,14 +49,14 @@ pip install -e .
 
 ```python
 import unittest
-from htmltestrunner import HTMLTestRunner
+from htmltestrunner import HTMLTestRunnerLit
 
 # 创建测试套件
 suite = unittest.TestLoader().loadTestsFromTestCase(YourTestCase)
 
 # 生成报告
 with open('report.html', 'wb') as f:
-    runner = HTMLTestRunner(
+    runner = HTMLTestRunnerLit(
         stream=f,
         title='API 测试报告',
         description='项目接口自动化测试',
@@ -68,7 +68,7 @@ with open('report.html', 'wb') as f:
 ### 自定义配置
 
 ```python
-runner = HTMLTestRunner(
+runner = HTMLTestRunnerLit(
     stream=f,
     title='测试报告',
     description='项目描述',
@@ -117,7 +117,7 @@ class TestDemo(unittest.TestCase):
 
 ## 🔧 API 参考
 
-### HTMLTestRunner
+### HTMLTestRunnerLit
 
 | 参数 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
@@ -129,6 +129,9 @@ class TestDemo(unittest.TestCase):
 | open_in_browser | bool | False | 测试完成后自动打开报告 |
 
 ## 📝 更新日志
+
+### v1.0.6
+- 🔄 将 `HTMLTestRunner` 重命名为 `HTMLTestRunnerLit`，解决命名冲突问题
 
 ### v1.0.5
 - 📸 新增截图轮播与网格视图，支持多图自动切换
